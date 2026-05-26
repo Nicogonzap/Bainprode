@@ -1,3 +1,5 @@
+// Tipos generados del schema real de Supabase (inspeccionado 2026-05-26)
+
 export type EstadoPartido = 'programado' | 'en_juego' | 'finalizado' | 'suspendido'
 export type FasePartido = 'grupos' | 'octavos' | 'cuartos' | 'semifinal' | 'tercer_puesto' | 'final'
 export type TipoEvento =
@@ -15,24 +17,31 @@ export type Database = {
       usuarios: {
         Row: {
           id: string
+          nombre_usuario: string
           email: string
-          nombre: string
+          password_hash: string | null
           avatar_url: string | null
+          fecha_registro: string
+          role: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
-          id: string
+          id?: string
+          nombre_usuario: string
           email: string
-          nombre: string
+          password_hash?: string | null
           avatar_url?: string | null
+          fecha_registro?: string
+          role?: string | null
           created_at?: string
           updated_at?: string
         }
         Update: {
+          nombre_usuario?: string
           email?: string
-          nombre?: string
           avatar_url?: string | null
+          role?: string | null
           updated_at?: string
         }
       }
@@ -41,24 +50,21 @@ export type Database = {
           id: string
           nombre: string
           codigo_invitacion: string
-          creador_id: string
-          max_participantes: number | null
-          es_publico: boolean
+          created_by: string
+          fecha_creacion: string
           created_at: string
         }
         Insert: {
           id?: string
           nombre: string
           codigo_invitacion?: string
-          creador_id: string
-          max_participantes?: number | null
-          es_publico?: boolean
+          created_by: string
+          fecha_creacion?: string
           created_at?: string
         }
         Update: {
           nombre?: string
-          max_participantes?: number | null
-          es_publico?: boolean
+          codigo_invitacion?: string
         }
       }
       usuarios_grupos: {
@@ -66,90 +72,75 @@ export type Database = {
           id: string
           usuario_id: string
           grupo_id: string
-          puntos_total: number
-          joined_at: string
+          fecha_union: string
         }
         Insert: {
           id?: string
           usuario_id: string
           grupo_id: string
-          puntos_total?: number
-          joined_at?: string
+          fecha_union?: string
         }
         Update: {
-          puntos_total?: number
+          fecha_union?: string
         }
       }
       equipos: {
         Row: {
           id: string
-          api_football_id: number | null
           nombre_pais: string
           codigo_iso: string
           continente: string
           ranking_fifa: number
           grupo_fase: string
+          logo_url: string | null
+          bandera_url: string | null
         }
         Insert: {
           id?: string
-          api_football_id?: number | null
           nombre_pais: string
           codigo_iso: string
           continente: string
           ranking_fifa: number
           grupo_fase: string
+          logo_url?: string | null
+          bandera_url?: string | null
         }
         Update: {
-          api_football_id?: number | null
           nombre_pais?: string
           codigo_iso?: string
           continente?: string
           ranking_fifa?: number
           grupo_fase?: string
+          logo_url?: string | null
+          bandera_url?: string | null
         }
       }
       grupo_equipos: {
         Row: {
           id: string
-          grupo_letra: string
+          grupo_fase: string
           equipo_id: string
-          pj: number
-          pg: number
-          pe: number
-          pp: number
-          gf: number
-          gc: number
         }
         Insert: {
           id?: string
-          grupo_letra: string
+          grupo_fase: string
           equipo_id: string
-          pj?: number
-          pg?: number
-          pe?: number
-          pp?: number
-          gf?: number
-          gc?: number
         }
         Update: {
-          pj?: number
-          pg?: number
-          pe?: number
-          pp?: number
-          gf?: number
-          gc?: number
+          grupo_fase?: string
         }
       }
       partidos: {
         Row: {
           id: string
-          api_football_id: number
+          api_fixture_id: number
           equipo_local_id: string
           equipo_visitante_id: string
           fecha_hora: string
           estadio: string | null
           ciudad: string | null
           fase: FasePartido
+          grupo_fase: string | null
           estado: EstadoPartido
           minuto_juego: number | null
           periodo: string | null
@@ -159,18 +150,22 @@ export type Database = {
           tarjetas_amarillas_visitante: number | null
           tarjetas_rojas_local: number | null
           tarjetas_rojas_visitante: number | null
+          ganador_id: string | null
+          diferencia_goles: number | null
+          ultimo_sync: string | null
           created_at: string
           updated_at: string
         }
         Insert: {
           id?: string
-          api_football_id: number
+          api_fixture_id: number
           equipo_local_id: string
           equipo_visitante_id: string
           fecha_hora: string
           estadio?: string | null
           ciudad?: string | null
           fase: FasePartido
+          grupo_fase?: string | null
           estado?: EstadoPartido
           minuto_juego?: number | null
           periodo?: string | null
@@ -180,6 +175,9 @@ export type Database = {
           tarjetas_amarillas_visitante?: number | null
           tarjetas_rojas_local?: number | null
           tarjetas_rojas_visitante?: number | null
+          ganador_id?: string | null
+          diferencia_goles?: number | null
+          ultimo_sync?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -193,6 +191,9 @@ export type Database = {
           tarjetas_amarillas_visitante?: number | null
           tarjetas_rojas_local?: number | null
           tarjetas_rojas_visitante?: number | null
+          ganador_id?: string | null
+          diferencia_goles?: number | null
+          ultimo_sync?: string | null
           updated_at?: string
         }
       }
@@ -200,33 +201,34 @@ export type Database = {
         Row: {
           id: string
           partido_id: string
-          api_event_id: number | null
+          equipo_id: string
           tipo: TipoEvento
           minuto: number
-          minuto_extra: number | null
-          equipo_id: string
+          minuto_adicional: number | null
           jugador_nombre: string | null
-          jugador_asistencia: string | null
+          jugador_nombre2: string | null
+          detalle: string | null
           created_at: string
         }
         Insert: {
           id?: string
           partido_id: string
-          api_event_id?: number | null
+          equipo_id: string
           tipo: TipoEvento
           minuto: number
-          minuto_extra?: number | null
-          equipo_id: string
+          minuto_adicional?: number | null
           jugador_nombre?: string | null
-          jugador_asistencia?: string | null
+          jugador_nombre2?: string | null
+          detalle?: string | null
           created_at?: string
         }
         Update: {
           tipo?: TipoEvento
           minuto?: number
-          minuto_extra?: number | null
+          minuto_adicional?: number | null
           jugador_nombre?: string | null
-          jugador_asistencia?: string | null
+          jugador_nombre2?: string | null
+          detalle?: string | null
         }
       }
       playoffs: {
@@ -234,22 +236,32 @@ export type Database = {
           id: string
           partido_id: string
           ronda: string
+          condicion_equipo1: string | null
+          condicion_equipo2: string | null
+          goles_et_local: number | null
+          goles_et_visitante: number | null
+          fue_a_penales: boolean | null
           penales_local: number | null
           penales_visitante: number | null
-          ganador_id: string | null
         }
         Insert: {
           id?: string
           partido_id: string
           ronda: string
+          condicion_equipo1?: string | null
+          condicion_equipo2?: string | null
+          goles_et_local?: number | null
+          goles_et_visitante?: number | null
+          fue_a_penales?: boolean | null
           penales_local?: number | null
           penales_visitante?: number | null
-          ganador_id?: string | null
         }
         Update: {
+          goles_et_local?: number | null
+          goles_et_visitante?: number | null
+          fue_a_penales?: boolean | null
           penales_local?: number | null
           penales_visitante?: number | null
-          ganador_id?: string | null
         }
       }
       predicciones: {
@@ -257,75 +269,68 @@ export type Database = {
           id: string
           usuario_id: string
           partido_id: string
-          goles_local_pred: number
-          goles_visitante_pred: number
+          goles_local: number
+          goles_visitante: number
+          ganador_predicho_id: string | null
+          fecha_prediccion: string
           puntos_obtenidos: number | null
-          calculado_at: string | null
-          created_at: string
-          updated_at: string
         }
         Insert: {
           id?: string
           usuario_id: string
           partido_id: string
-          goles_local_pred: number
-          goles_visitante_pred: number
+          goles_local: number
+          goles_visitante: number
+          ganador_predicho_id?: string | null
+          fecha_prediccion?: string
           puntos_obtenidos?: number | null
-          calculado_at?: string | null
-          created_at?: string
-          updated_at?: string
         }
         Update: {
-          goles_local_pred?: number
-          goles_visitante_pred?: number
+          goles_local?: number
+          goles_visitante?: number
+          ganador_predicho_id?: string | null
           puntos_obtenidos?: number | null
-          calculado_at?: string | null
-          updated_at?: string
         }
       }
       reglas_puntaje: {
         Row: {
           id: string
-          fase: FasePartido
-          acierto_resultado: number
-          acierto_marcador_exacto: number
-          acierto_diferencia_goles: number | null
+          descripcion: string | null
+          condicion: string | null
+          puntos: number
         }
         Insert: {
           id?: string
-          fase: FasePartido
-          acierto_resultado: number
-          acierto_marcador_exacto: number
-          acierto_diferencia_goles?: number | null
+          descripcion?: string | null
+          condicion?: string | null
+          puntos: number
         }
         Update: {
-          acierto_resultado?: number
-          acierto_marcador_exacto?: number
-          acierto_diferencia_goles?: number | null
+          descripcion?: string | null
+          condicion?: string | null
+          puntos?: number
         }
       }
       historial_puntos: {
         Row: {
           id: string
           usuario_id: string
-          grupo_id: string
           partido_id: string
           puntos: number
-          detalle: string | null
-          created_at: string
+          regla_aplicada: string | null
+          calculado_en: string
         }
         Insert: {
           id?: string
           usuario_id: string
-          grupo_id: string
           partido_id: string
           puntos: number
-          detalle?: string | null
-          created_at?: string
+          regla_aplicada?: string | null
+          calculado_en?: string
         }
         Update: {
           puntos?: number
-          detalle?: string | null
+          regla_aplicada?: string | null
         }
       }
     }
@@ -333,48 +338,64 @@ export type Database = {
       leaderboard: {
         Row: {
           grupo_id: string
+          nombre_torneo: string
           usuario_id: string
-          nombre: string
+          nombre_usuario: string
           avatar_url: string | null
-          puntos_total: number
+          fecha_registro: string
+          puntos_totales: number
+          partidos_puntuados: number
           posicion: number
         }
       }
       partidos_en_vivo: {
         Row: {
           id: string
-          api_football_id: number
-          equipo_local_id: string
-          equipo_visitante_id: string
-          nombre_local: string
-          nombre_visitante: string
-          codigo_iso_local: string
-          codigo_iso_visitante: string
-          goles_local: number | null
-          goles_visitante: number | null
-          minuto_juego: number | null
-          periodo: string | null
-          estado: EstadoPartido
+          api_fixture_id: number
           fase: FasePartido
+          grupo_fase: string | null
+          fecha_hora: string
           estadio: string | null
           ciudad: string | null
-          fecha_hora: string
+          estado: EstadoPartido
+          minuto_juego: number | null
+          periodo: string | null
+          local_id: string
+          local_nombre: string
+          local_iso: string
+          local_bandera: string | null
+          local_logo: string | null
+          goles_local: number | null
+          tarjetas_amarillas_local: number | null
+          tarjetas_rojas_local: number | null
+          visitante_id: string
+          visitante_nombre: string
+          visitante_iso: string
+          visitante_bandera: string | null
+          visitante_logo: string | null
+          goles_visitante: number | null
+          tarjetas_amarillas_visitante: number | null
+          tarjetas_rojas_visitante: number | null
+          ultimo_sync: string | null
+          updated_at: string
         }
       }
       predicciones_vs_resultado: {
         Row: {
           prediccion_id: string
-          usuario_id: string
-          partido_id: string
-          nombre_local: string
-          nombre_visitante: string
-          goles_local_pred: number
-          goles_visitante_pred: number
-          goles_local_real: number | null
-          goles_visitante_real: number | null
+          nombre_usuario: string
+          local: string
+          visitante: string
+          fase: FasePartido
+          fecha_hora: string
+          pred_goles_local: number
+          pred_goles_visitante: number
+          pred_ganador: string | null
+          real_goles_local: number | null
+          real_goles_visitante: number | null
+          real_ganador: string | null
           estado_partido: EstadoPartido
           puntos_obtenidos: number | null
-          fase: FasePartido
         }
       }
     }
@@ -392,7 +413,7 @@ export type Database = {
   }
 }
 
-// Convenience row types
+// ── Convenience row types ──────────────────────────────────────────────────────
 export type Usuario = Database['public']['Tables']['usuarios']['Row']
 export type GrupoTorneo = Database['public']['Tables']['grupos_torneo']['Row']
 export type UsuarioGrupo = Database['public']['Tables']['usuarios_grupos']['Row']
@@ -405,17 +426,15 @@ export type Prediccion = Database['public']['Tables']['predicciones']['Row']
 export type ReglasPuntaje = Database['public']['Tables']['reglas_puntaje']['Row']
 export type HistorialPuntos = Database['public']['Tables']['historial_puntos']['Row']
 
-// Convenience view types
+// ── Convenience view types ─────────────────────────────────────────────────────
 export type LeaderboardRow = Database['public']['Views']['leaderboard']['Row']
 export type PartidoEnVivo = Database['public']['Views']['partidos_en_vivo']['Row']
 export type PrediccionVsResultado = Database['public']['Views']['predicciones_vs_resultado']['Row']
 
-// Insert types
-export type UsuarioInsert = Database['public']['Tables']['usuarios']['Insert']
-export type GrupoTorneoInsert = Database['public']['Tables']['grupos_torneo']['Insert']
-export type PrediccionInsert = Database['public']['Tables']['predicciones']['Insert']
-export type PrediccionUpdate = Database['public']['Tables']['predicciones']['Update']
+// ── Insert / Update types ──────────────────────────────────────────────────────
+export type EquipoInsert = Database['public']['Tables']['equipos']['Insert']
 export type PartidoInsert = Database['public']['Tables']['partidos']['Insert']
 export type PartidoUpdate = Database['public']['Tables']['partidos']['Update']
+export type PrediccionInsert = Database['public']['Tables']['predicciones']['Insert']
+export type PrediccionUpdate = Database['public']['Tables']['predicciones']['Update']
 export type EventoInsert = Database['public']['Tables']['eventos_partido']['Insert']
-export type EquipoInsert = Database['public']['Tables']['equipos']['Insert']

@@ -97,10 +97,14 @@ const EQUIPOS: EquipoInsert[] = [
 async function main() {
   console.log(`Insertando ${EQUIPOS.length} equipos...`)
 
-  const { data: equiposInsertados, error: equiposError } = await supabase
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data: equiposInsertados, error: equiposError } = await (supabase as any)
     .from('equipos')
     .upsert(EQUIPOS, { onConflict: 'nombre_pais' })
-    .select('id, nombre_pais, grupo_fase')
+    .select('id, nombre_pais, grupo_fase') as {
+      data: { id: string; nombre_pais: string; grupo_fase: string }[] | null
+      error: { message: string } | null
+    }
 
   if (equiposError) {
     console.error('Error insertando equipos:', equiposError.message)
@@ -114,19 +118,14 @@ async function main() {
     console.log('Inicializando standings de grupo_equipos...')
 
     const standings = equiposInsertados.map((e) => ({
-      grupo_letra: e.grupo_fase,
+      grupo_fase: e.grupo_fase,
       equipo_id: e.id,
-      pj: 0,
-      pg: 0,
-      pe: 0,
-      pp: 0,
-      gf: 0,
-      gc: 0,
     }))
 
-    const { error: standingsError } = await supabase
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { error: standingsError } = await (supabase as any)
       .from('grupo_equipos')
-      .upsert(standings, { onConflict: 'equipo_id' })
+      .upsert(standings, { onConflict: 'equipo_id' }) as { error: { message: string } | null }
 
     if (standingsError) {
       console.error('Error en grupo_equipos:', standingsError.message)
