@@ -48,7 +48,7 @@ const EQUIPOS: EquipoInsert[] = [
   // ── GRUPO E ──────────────────────────────────────────────────────────────
   { nombre_pais: 'Alemania',          codigo_iso: 'DE', continente: 'UEFA',     ranking_fifa: 12, grupo_fase: 'E' },
   { nombre_pais: 'Curazao',           codigo_iso: 'CW', continente: 'CONCACAF', ranking_fifa: 85, grupo_fase: 'E' },
-  { nombre_pais: 'Costa Rica',        codigo_iso: 'CR', continente: 'CONCACAF', ranking_fifa: 47, grupo_fase: 'E' },
+  { nombre_pais: 'Costa de Marfil',   codigo_iso: 'CI', continente: 'CAF',      ranking_fifa: 48, grupo_fase: 'E' },
   { nombre_pais: 'Ecuador',           codigo_iso: 'EC', continente: 'CONMEBOL', ranking_fifa: 33, grupo_fase: 'E' },
 
   // ── GRUPO F ──────────────────────────────────────────────────────────────

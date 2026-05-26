@@ -92,6 +92,7 @@ const ALIAS: Record<string, string> = {
   'switzerland': 'suiza',
   'qatar': 'catar',
   'cape verde': 'cabo verde',
+  'cape verde islands': 'cabo verde',
   'saudi arabia': 'arabia saudita',
   'haiti': 'haití',
   'jordan': 'jordania',
@@ -124,7 +125,8 @@ const ALIAS: Record<string, string> = {
   'senegal': 'senegal',
   'ghana': 'ghana',
   'egypt': 'egipto',
-  'costa rica': 'costa rica',
+  'ivory coast': 'costa de marfil',
+  "côte d'ivoire": 'costa de marfil',
   'australia': 'australia',
   'austria': 'austria',
   'canada': 'canadá',
@@ -226,7 +228,7 @@ async function main() {
       goles_local: fixture.goals.home,
       goles_visitante: fixture.goals.away,
       ganador_id: ganadorId,
-      diferencia_goles: diferenciaGoles,
+      // diferencia_goles es columna GENERADA en la BD, no se inserta
       ultimo_sync: new Date().toISOString(),
       updated_at: new Date().toISOString(),
     }
