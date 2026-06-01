@@ -1,0 +1,355 @@
+﻿'use client'
+
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { ChevronDown, Check, Calendar, Grid3x3 } from 'lucide-react'
+import { TopNav } from '@/components/top-nav'
+import { Footer } from '@/components/footer'
+import { CountryFlag } from '@/components/country-flag'
+import { ToastProvider, useToast } from '@/components/toast'
+import { useAuth } from '@/lib/auth-context'
+import {
+  ALL_GROUP_MATCHES,
+  matchesByDate,
+  matchesByGroup,
+  calculateGroupStandings,
+  type Predictions,
+  type GroupKey,
+} from '@/lib/groups'
+
+const BAIN = {
+  red: '#CC0000',
+  redHover: '#990000',
+  redLight: '#FFF0F0',
+  black: '#000000',
+  white: '#FFFFFF',
+  grayBg: '#F5F5F5',
+  grayBorder: '#E5E5E5',
+  graySecondary: '#666666',
+  grayTertiary: '#999999',
+  success: '#0F7B3E',
+  classified: '#1A7A3E',
+} as const
+
+type ViewMode = 'fecha' | 'grupo'
+const TOTAL_WORLD_CUP_MATCHES = 104
+
+function PrediccionesContent() {
+  const { toast } = useToast()
+  const { user } = useAuth()
+  const [viewMode, setViewMode] = useState<ViewMode>('fecha')
+  const [predictions, setPredictions] = useState<Predictions>({})
+  const [savingId, setSavingId] = useState<string | null>(null)
+
+  // Cargar predicciones existentes al montar
+  useEffect(() => {
+    if (!user) return
+    fetch(`/api/predicciones?usuario_id=${user.id}`)
+      .then((r) => r.json())
+      .then(({ data }) => {
+        if (!data) return
+        const mapped: Predictions = {}
+        for (const p of data) {
+          // Buscar el match en ALL_GROUP_MATCHES por partido_id
+          const match = ALL_GROUP_MATCHES.find((m) => m.id === p.partido_id)
+          if (match) {
+            mapped[p.partido_id] = { home: p.goles_local, away: p.goles_visitante }
+          }
+        }
+        setPredictions(mapped)
+      })
+      .catch(() => {})
+  }, [user])
+
+  const loadedCount = useMemo(
+    () => Object.values(predictions).filter((p) => p.home !== '' && p.away !== '').length,
+    [predictions]
+  )
+
+  const updatePrediction = useCallback(
+    async (matchId: string, side: 'home' | 'away', value: string) => {
+      const parsed = value === '' ? '' : Math.max(0, Math.min(20, Number(value) || 0))
+      const prev = predictions
+      const next: Predictions = {
+        ...prev,
+        [matchId]: {
+          ...prev[matchId],
+          home: prev[matchId]?.home ?? '',
+          away: prev[matchId]?.away ?? '',
+          [side]: parsed,
+        },
+      }
+      setPredictions(next)
+
+      const current = next[matchId]
+      if (current.home !== '' && current.away !== '' && user) {
+        setSavingId(matchId)
+        try {
+          await fetch('/api/predicciones', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              usuario_id: user.id,
+              partido_id: matchId,
+              goles_local: current.home,
+              goles_visitante: current.away,
+            }),
+          })
+          const match = ALL_GROUP_MATCHES.find((m) => m.id === matchId)
+          if (match && prev[matchId]?.home === '' || prev[matchId] === undefined) {
+            toast({
+              message: `Guardado: ${match?.homeName} ${current.home}–${current.away} ${match?.awayName}`,
+              type: 'success',
+              duration: 2000,
+            })
+          }
+        } catch {
+          toast({ message: 'Error al guardar predicción', type: 'error', duration: 2000 })
+        } finally {
+          setSavingId(null)
+        }
+      }
+    },
+    [predictions, user, toast]
+  )
+
+  const clearPrediction = useCallback(
+    (matchId: string) => {
+      setPredictions((prev) => {
+        const next = { ...prev }
+        delete next[matchId]
+        return next
+      })
+      toast({ message: 'Predicción borrada', type: 'info', duration: 1500 })
+    },
+    [toast]
+  )
+
+  return (
+    <div className="min-h-screen flex flex-col" style={{ backgroundColor: BAIN.grayBg }}>
+      <TopNav activePage="predicciones" />
+
+      <div
+        className="sticky top-16 z-40"
+        style={{ backgroundColor: BAIN.white, borderBottom: `1px solid ${BAIN.grayBorder}` }}
+      >
+        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between gap-4">
+          <nav className="flex items-center gap-1" role="tablist">
+            <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
+            <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
+          </nav>
+          <button
+            type="button"
+            className="hidden sm:flex items-center gap-2 text-sm py-2 px-3 rounded-md flex-shrink-0 transition-colors"
+            style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black, backgroundColor: BAIN.white }}
+          >
+            Fase: Grupos
+            <ChevronDown size={14} />
+          </button>
+        </div>
+      </div>
+
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
+        <section className="mb-8 flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
+              Predicciones
+            </h1>
+            <p className="text-sm" style={{ color: BAIN.graySecondary }}>
+              {viewMode === 'fecha' ? 'Cargá tus pronósticos partido por partido, ordenados por fecha.' : 'Mirá cómo quedarían los grupos según tus predicciones.'}
+            </p>
+          </div>
+          <div className="rounded-md px-4 py-3" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+            <p className="text-xs font-medium mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>CARGADAS</p>
+            <p className="text-xl font-bold tracking-tight" style={{ color: BAIN.black }}>
+              <span style={{ color: BAIN.red }}>{loadedCount}</span>
+              <span style={{ color: BAIN.grayTertiary }}> / {TOTAL_WORLD_CUP_MATCHES}</span>
+            </p>
+          </div>
+        </section>
+
+        {viewMode === 'fecha' ? (
+          <ViewByDate predictions={predictions} updatePrediction={updatePrediction} clearPrediction={clearPrediction} savingId={savingId} />
+        ) : (
+          <ViewByGroup predictions={predictions} updatePrediction={updatePrediction} clearPrediction={clearPrediction} />
+        )}
+      </main>
+
+      <Footer />
+    </div>
+  )
+}
+
+function ViewByDate({ predictions, updatePrediction, clearPrediction, savingId }: {
+  predictions: Predictions
+  updatePrediction: (id: string, side: 'home' | 'away', v: string) => void
+  clearPrediction: (id: string) => void
+  savingId: string | null
+}) {
+  const days = useMemo(() => matchesByDate(), [])
+  return (
+    <>
+      {days.map((day, dayIdx) => (
+        <section key={day.dateSort} className="mb-8 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${dayIdx * 50}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
+          <h2 className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{day.date}</h2>
+          <div className="flex flex-col gap-3">
+            {day.matches.map((m) => (
+              <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={updatePrediction} onClear={clearPrediction} showGroup saving={savingId === m.id} />
+            ))}
+          </div>
+        </section>
+      ))}
+    </>
+  )
+}
+
+function ViewByGroup({ predictions, updatePrediction, clearPrediction }: {
+  predictions: Predictions
+  updatePrediction: (id: string, side: 'home' | 'away', v: string) => void
+  clearPrediction: (id: string) => void
+}) {
+  const groups = useMemo(() => matchesByGroup(), [])
+  return (
+    <>
+      {groups.map((g, gIdx) => (
+        <GroupSection key={g.group} groupKey={g.group} teams={g.teams} matches={g.matches} predictions={predictions} onUpdate={updatePrediction} onClear={clearPrediction} delay={gIdx * 50} />
+      ))}
+    </>
+  )
+}
+
+function GroupSection({ groupKey, teams, matches, predictions, onUpdate, onClear, delay }: {
+  groupKey: GroupKey; teams: { code: string; name: string }[]; matches: typeof ALL_GROUP_MATCHES
+  predictions: Predictions; onUpdate: (id: string, side: 'home' | 'away', v: string) => void; onClear: (id: string) => void; delay: number
+}) {
+  const [expanded, setExpanded] = useState(groupKey === 'J')
+  const standings = useMemo(() => calculateGroupStandings(groupKey, predictions), [groupKey, predictions])
+  const completedMatches = matches.filter((m) => predictions[m.id]?.home !== '' && predictions[m.id]?.away !== '' && predictions[m.id]).length
+
+  return (
+    <section className="mb-6 rounded-md overflow-hidden animate-in fade-in slide-in-from-bottom-2" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${delay}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
+      <button type="button" onClick={() => setExpanded((s) => !s)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-4">
+          <div className="w-10 h-10 rounded-md flex items-center justify-center font-bold text-base" style={{ backgroundColor: BAIN.black, color: BAIN.white }}>{groupKey}</div>
+          <div className="text-left">
+            <p className="text-base font-bold tracking-tight" style={{ color: BAIN.black }}>Grupo {groupKey}</p>
+            <p className="text-xs" style={{ color: BAIN.graySecondary }}>{teams.map((t) => t.name).join(' · ')}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold" style={{ color: completedMatches === 6 ? BAIN.success : BAIN.graySecondary }}>{completedMatches}/6 cargados</span>
+          <ChevronDown size={18} strokeWidth={2} style={{ color: BAIN.graySecondary, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-6 pb-6 grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+          <div className="lg:col-span-3 pt-6">
+            <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS DEL GRUPO</p>
+            <div className="flex flex-col gap-3">
+              {matches.map((m) => <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />)}
+            </div>
+          </div>
+          <div className="lg:col-span-2 pt-6">
+            <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>SI TUS PREDICCIONES SE CUMPLEN</p>
+            <StandingsTable standings={standings} />
+            <p className="text-xs mt-3" style={{ color: BAIN.graySecondary }}>Los 2 primeros pasan a 16vos.<br /><span style={{ color: BAIN.grayTertiary }}>+ 8 mejores terceros de los 12 grupos.</span></p>
+          </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function StandingsTable({ standings }: { standings: ReturnType<typeof calculateGroupStandings> }) {
+  const allEmpty = standings.every((r) => r.pj === 0)
+  return (
+    <div className="rounded-md overflow-hidden" style={{ border: `1px solid ${BAIN.grayBorder}` }}>
+      <table className="w-full text-xs">
+        <thead>
+          <tr style={{ backgroundColor: BAIN.grayBg }}>
+            <th className="text-left px-2 py-2 font-bold uppercase w-6" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }}></th>
+            <th className="text-left px-2 py-2 font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }}>EQUIPO</th>
+            <th className="text-center px-1 py-2 font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }} title="Partidos jugados">PJ</th>
+            <th className="text-center px-1 py-2 font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }} title="Diferencia de goles">DG</th>
+            <th className="text-center px-1 py-2 font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }} title="Puntos">PTS</th>
+          </tr>
+        </thead>
+        <tbody>
+          {standings.map((row, idx) => {
+            const isClassified = idx < 2 && !allEmpty
+            const isThird = idx === 2 && !allEmpty
+            return (
+              <tr key={row.code} style={{ backgroundColor: isClassified ? `#1A7A3E10` : isThird ? `#1A7A3E05` : BAIN.white, borderTop: `1px solid ${BAIN.grayBorder}` }}>
+                <td className="px-2 py-2.5"><span className="inline-flex items-center justify-center w-5 h-5 rounded text-xs font-bold" style={{ backgroundColor: isClassified ? '#1A7A3E' : BAIN.grayBg, color: isClassified ? BAIN.white : BAIN.graySecondary }}>{idx + 1}</span></td>
+                <td className="px-2 py-2.5"><div className="flex items-center gap-2"><CountryFlag code={row.code} size="sm" /><span className="font-medium truncate" style={{ color: BAIN.black, fontSize: '12px' }}>{row.name}</span></div></td>
+                <td className="px-1 py-2.5 text-center" style={{ color: BAIN.graySecondary }}>{row.pj}</td>
+                <td className="px-1 py-2.5 text-center font-medium" style={{ color: row.dg > 0 ? BAIN.success : row.dg < 0 ? BAIN.red : BAIN.black }}>{row.pj === 0 ? '—' : row.dg > 0 ? `+${row.dg}` : row.dg}</td>
+                <td className="px-1 py-2.5 text-center font-bold" style={{ color: BAIN.black }}>{row.pts}</td>
+              </tr>
+            )
+          })}
+        </tbody>
+      </table>
+    </div>
+  )
+}
+
+function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button type="button" role="tab" aria-selected={active} onClick={onClick} className="text-sm font-medium px-4 py-3 transition-colors whitespace-nowrap flex items-center gap-2" style={{ color: active ? BAIN.black : BAIN.graySecondary, borderBottom: `2px solid ${active ? BAIN.red : 'transparent'}` }}>
+      <span style={{ color: active ? BAIN.red : BAIN.graySecondary }}>{icon}</span>
+      {label}
+    </button>
+  )
+}
+
+function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, compact = false, saving = false }: {
+  match: typeof ALL_GROUP_MATCHES[number]; prediction: { home: number | ''; away: number | '' }
+  onUpdate: (id: string, side: 'home' | 'away', v: string) => void; onClear: (id: string) => void
+  showGroup?: boolean; compact?: boolean; saving?: boolean
+}) {
+  const isComplete = prediction.home !== '' && prediction.away !== ''
+  return (
+    <div className="rounded-md transition-all" style={{ backgroundColor: BAIN.white, border: `1px solid ${isComplete ? BAIN.success + '40' : BAIN.grayBorder}`, padding: compact ? '14px 16px' : '20px' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{showGroup && `GRUPO ${match.group} · `}{match.time}</span>
+          {saving && <span className="text-[10px] text-gray-400 uppercase">guardando…</span>}
+          {isComplete && !saving && (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, letterSpacing: '0.06em' }}>
+              <Check size={10} strokeWidth={3} />GUARDADA
+            </span>
+          )}
+        </div>
+        {!compact && <span className="text-xs" style={{ color: BAIN.graySecondary }}>{match.venue}</span>}
+      </div>
+      <div className="grid grid-cols-3 items-center gap-3">
+        <div className="flex items-center gap-2 justify-end">
+          <div className="text-right hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.homeName}</p></div>
+          <CountryFlag code={match.home} size={compact ? 'sm' : 'md'} />
+          <input type="number" min="0" max="20" placeholder="0" value={prediction.home} onChange={(e) => onUpdate(match.id, 'home', e.target.value)} className="w-14 h-11 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.homeName}`} />
+        </div>
+        <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
+        <div className="flex items-center gap-2 justify-start">
+          <input type="number" min="0" max="20" placeholder="0" value={prediction.away} onChange={(e) => onUpdate(match.id, 'away', e.target.value)} className="w-14 h-11 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.awayName}`} />
+          <CountryFlag code={match.away} size={compact ? 'sm' : 'md'} />
+          <div className="hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.awayName}</p></div>
+        </div>
+      </div>
+      {!compact && (
+        <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+          <p className="text-xs" style={{ color: BAIN.graySecondary }}>Tu predicción se guarda automáticamente</p>
+          {isComplete && <button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button>}
+        </div>
+      )}
+      {compact && isComplete && <div className="flex justify-end mt-2"><button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button></div>}
+    </div>
+  )
+}
+
+export default function PrediccionesPage() {
+  return (
+    <ToastProvider>
+      <PrediccionesContent />
+    </ToastProvider>
+  )
+}
