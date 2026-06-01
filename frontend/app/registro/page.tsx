@@ -26,8 +26,8 @@ const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
   { value: 'C', label: 'C — Consultant' },
   { value: 'M', label: 'M — Manager' },
   { value: 'SM', label: 'SM — Senior Manager' },
-  { value: 'AP', label: 'AP — Associate Principal' },
-  { value: 'P', label: 'P — Principal' },
+  { value: 'AP', label: 'AP — Associate Partner' },
+  { value: 'P', label: 'P — Partner' },
 ]
 
 type FormErrors = {
