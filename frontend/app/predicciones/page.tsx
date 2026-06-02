@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3 } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -10,7 +10,6 @@ import { useAuth } from '@/lib/auth-context'
 
 const BAIN = {
   red: '#CC0000',
-  redHover: '#990000',
   black: '#000000',
   white: '#FFFFFF',
   grayBg: '#F5F5F5',
@@ -18,12 +17,12 @@ const BAIN = {
   graySecondary: '#666666',
   grayTertiary: '#999999',
   success: '#0F7B3E',
-  classified: '#1A7A3E',
 } as const
 
 const TZ = 'America/Argentina/Buenos_Aires'
 const DAYS_ES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES', 'SÁBADO']
 const MONTHS_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
+const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
 type ViewMode = 'fecha' | 'grupo'
 type Predictions = Record<string, { home: number | ''; away: number | '' }>
@@ -39,7 +38,7 @@ type DisplayMatch = {
   id: string; group: string
   home: string; homeUrl: string | null; homeName: string; homeId: string
   away: string; awayUrl: string | null; awayName: string; awayId: string
-  dateSort: string; dateLabel: string; time: string; venue: string; estado: string
+  dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string
 }
 type StandingRow = {
   id: string; name: string; code: string; url: string | null
@@ -51,6 +50,7 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
   const inTz = new Date(d.toLocaleString('en-US', { timeZone: TZ }))
   const dateSort = `${inTz.getFullYear()}-${String(inTz.getMonth() + 1).padStart(2, '0')}-${String(inTz.getDate()).padStart(2, '0')}`
   const dateLabel = `${DAYS_ES[inTz.getDay()]} ${inTz.getDate()} DE ${MONTHS_ES[inTz.getMonth()]}`
+  const shortDate = `${inTz.getDate()} ${MONTHS_SHORT[inTz.getMonth()]}`
   const time = `${String(inTz.getHours()).padStart(2, '0')}.${String(inTz.getMinutes()).padStart(2, '0')}`
   return {
     id: p.id,
@@ -63,9 +63,7 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
     awayUrl: p.equipo_visitante.bandera_url,
     awayName: p.equipo_visitante.nombre_pais,
     awayId: p.equipo_visitante.id,
-    dateSort,
-    dateLabel,
-    time,
+    dateSort, dateLabel, shortDate, time,
     venue: [p.estadio, p.ciudad].filter(Boolean).join(', '),
     estado: p.estado,
   }
@@ -95,11 +93,11 @@ function calcGroupStandings(groupMatches: DisplayMatch[], predictions: Predictio
 function PrediccionesContent() {
   const { toast } = useToast()
   const { user } = useAuth()
-  const [viewMode, setViewMode] = useState<ViewMode>('fecha')
+  const [viewMode, setViewMode] = useState<ViewMode>('grupo')
   const [matches, setMatches] = useState<DisplayMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [predictions, setPredictions] = useState<Predictions>({})
-  const [savingId, setSavingId] = useState<string | null>(null)
+  const [savingGroup, setSavingGroup] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/partidos?fase=grupos')
@@ -126,42 +124,50 @@ function PrediccionesContent() {
     [predictions]
   )
 
-  const updatePrediction = useCallback(
-    async (matchId: string, side: 'home' | 'away', value: string) => {
-      const parsed = value === '' ? '' : Math.max(0, Math.min(20, Number(value) || 0))
-      const prev = predictions
-      const next: Predictions = {
-        ...prev,
-        [matchId]: { ...prev[matchId], home: prev[matchId]?.home ?? '', away: prev[matchId]?.away ?? '', [side]: parsed },
-      }
-      setPredictions(next)
-      const current = next[matchId]
-      if (current.home !== '' && current.away !== '' && user) {
-        setSavingId(matchId)
-        try {
-          await fetch('/api/predicciones', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ usuario_id: user.id, partido_id: matchId, goles_local: current.home, goles_visitante: current.away }),
-          })
-          const match = matches.find(m => m.id === matchId)
-          if (match && (!prev[matchId] || prev[matchId].home === '')) {
-            toast({ message: `Guardado: ${match.homeName} ${current.home}–${current.away} ${match.awayName}`, type: 'success', duration: 2000 })
-          }
-        } catch {
-          toast({ message: 'Error al guardar predicción', type: 'error', duration: 2000 })
-        } finally {
-          setSavingId(null)
-        }
-      }
-    },
-    [predictions, user, toast, matches]
-  )
+  const updatePrediction = useCallback((matchId: string, side: 'home' | 'away', value: string) => {
+    const parsed = value === '' ? '' : Math.max(0, Math.min(20, Number(value) || 0))
+    setPredictions(prev => ({
+      ...prev,
+      [matchId]: { ...prev[matchId], home: prev[matchId]?.home ?? '', away: prev[matchId]?.away ?? '', [side]: parsed },
+    }))
+  }, [])
 
   const clearPrediction = useCallback((matchId: string) => {
     setPredictions(prev => { const next = { ...prev }; delete next[matchId]; return next })
-    toast({ message: 'Predicción borrada', type: 'info', duration: 1500 })
-  }, [toast])
+  }, [])
+
+  const saveGroup = useCallback(async (groupMatchIds: string[]) => {
+    if (!user) return
+    const toSave = groupMatchIds
+      .map(id => ({ id, pred: predictions[id] }))
+      .filter(({ pred }) => pred && pred.home !== '' && pred.away !== '')
+
+    if (toSave.length === 0) {
+      toast({ message: 'Completá al menos un resultado antes de guardar', type: 'info', duration: 2500 })
+      return
+    }
+
+    const groupKey = matches.find(m => m.id === groupMatchIds[0])?.group ?? ''
+    setSavingGroup(groupKey)
+    try {
+      await Promise.all(toSave.map(({ id, pred }) =>
+        fetch('/api/predicciones', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ usuario_id: user.id, partido_id: id, goles_local: pred!.home, goles_visitante: pred!.away }),
+        })
+      ))
+      toast({
+        message: `${toSave.length} predicción${toSave.length > 1 ? 'es' : ''} guardada${toSave.length > 1 ? 's' : ''} — Grupo ${groupKey}`,
+        type: 'success',
+        duration: 3000,
+      })
+    } catch {
+      toast({ message: 'Error al guardar predicciones', type: 'error', duration: 2000 })
+    } finally {
+      setSavingGroup(null)
+    }
+  }, [user, predictions, matches, toast])
 
   const dayGroups = useMemo(() => {
     const map = new Map<string, DisplayMatch[]>()
@@ -191,12 +197,9 @@ function PrediccionesContent() {
       <div className="sticky top-16 z-40" style={{ backgroundColor: BAIN.white, borderBottom: `1px solid ${BAIN.grayBorder}` }}>
         <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between gap-4">
           <nav className="flex items-center gap-1" role="tablist">
-            <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
+            <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
           </nav>
-          <button type="button" className="hidden sm:flex items-center gap-2 text-sm py-2 px-3 rounded-md flex-shrink-0" style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black, backgroundColor: BAIN.white }}>
-            Fase: Grupos <ChevronDown size={14} />
-          </button>
         </div>
       </div>
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
@@ -204,7 +207,7 @@ function PrediccionesContent() {
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>Predicciones</h1>
             <p className="text-sm" style={{ color: BAIN.graySecondary }}>
-              {viewMode === 'fecha' ? 'Cargá tus pronósticos partido por partido, ordenados por fecha.' : 'Mirá cómo quedarían los grupos según tus predicciones.'}
+              {viewMode === 'grupo' ? 'Completá los resultados y guardá las predicciones de cada grupo.' : 'Partidos ordenados por fecha.'}
             </p>
           </div>
           <div className="rounded-md px-4 py-3" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
@@ -219,23 +222,33 @@ function PrediccionesContent() {
           <div className="flex items-center justify-center py-20">
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
           </div>
-        ) : viewMode === 'fecha' ? (
+        ) : viewMode === 'grupo' ? (
+          <>
+            {groupSections.map((g, gIdx) => (
+              <GroupSection
+                key={g.group}
+                groupKey={g.group}
+                matches={g.matches}
+                predictions={predictions}
+                onUpdate={updatePrediction}
+                onClear={clearPrediction}
+                onSave={() => saveGroup(g.matches.map(m => m.id))}
+                saving={savingGroup === g.group}
+                delay={gIdx * 50}
+              />
+            ))}
+          </>
+        ) : (
           <>
             {dayGroups.map((day, dayIdx) => (
               <section key={day.dateSort} className="mb-8 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${dayIdx * 50}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
                 <h2 className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{day.dateLabel}</h2>
                 <div className="flex flex-col gap-3">
                   {day.matches.map(m => (
-                    <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={updatePrediction} onClear={clearPrediction} showGroup saving={savingId === m.id} />
+                    <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={updatePrediction} onClear={clearPrediction} showGroup />
                   ))}
                 </div>
               </section>
-            ))}
-          </>
-        ) : (
-          <>
-            {groupSections.map((g, gIdx) => (
-              <GroupSection key={g.group} groupKey={g.group} matches={g.matches} predictions={predictions} onUpdate={updatePrediction} onClear={clearPrediction} delay={gIdx * 50} />
             ))}
           </>
         )}
@@ -245,14 +258,19 @@ function PrediccionesContent() {
   )
 }
 
-function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay }: {
+function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, onSave, saving, delay }: {
   groupKey: string; matches: DisplayMatch[]
-  predictions: Predictions; onUpdate: (id: string, side: 'home' | 'away', v: string) => void
-  onClear: (id: string) => void; delay: number
+  predictions: Predictions
+  onUpdate: (id: string, side: 'home' | 'away', v: string) => void
+  onClear: (id: string) => void
+  onSave: () => void
+  saving: boolean
+  delay: number
 }) {
   const [expanded, setExpanded] = useState(groupKey === 'J')
   const standings = useMemo(() => calcGroupStandings(matches, predictions), [matches, predictions])
-  const completedMatches = matches.filter(m => { const p = predictions[m.id]; return p && p.home !== '' && p.away !== '' }).length
+  const filledCount = matches.filter(m => { const p = predictions[m.id]; return p && p.home !== '' && p.away !== '' }).length
+
   const teamNames = useMemo(() => {
     const seen = new Set<string>(); const names: string[] = []
     for (const m of matches) {
@@ -273,17 +291,29 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold" style={{ color: completedMatches === 6 ? BAIN.success : BAIN.graySecondary }}>{completedMatches}/6 cargados</span>
+          <span className="text-xs font-bold" style={{ color: filledCount === 6 ? BAIN.success : BAIN.graySecondary }}>{filledCount}/6</span>
           <ChevronDown size={18} strokeWidth={2} style={{ color: BAIN.graySecondary, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
         </div>
       </button>
       {expanded && (
         <div className="px-6 pb-6 grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
-          <div className="lg:col-span-3 pt-6">
-            <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS DEL GRUPO</p>
+          <div className="lg:col-span-3 pt-6 flex flex-col gap-4">
+            <p className="text-xs font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS DEL GRUPO</p>
             <div className="flex flex-col gap-3">
-              {matches.map(m => <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />)}
+              {matches.map(m => (
+                <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />
+              ))}
             </div>
+            <button
+              type="button"
+              onClick={onSave}
+              disabled={saving}
+              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-md text-sm font-bold transition-all"
+              style={{ backgroundColor: saving ? BAIN.grayBorder : BAIN.red, color: saving ? BAIN.graySecondary : BAIN.white, cursor: saving ? 'not-allowed' : 'pointer' }}
+            >
+              <Save size={15} strokeWidth={2.5} />
+              {saving ? 'Guardando…' : 'Guardar predicciones del grupo'}
+            </button>
           </div>
           <div className="lg:col-span-2 pt-6">
             <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>SI TUS PREDICCIONES SE CUMPLEN</p>
@@ -339,21 +369,23 @@ function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; labe
   )
 }
 
-function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, compact = false, saving = false }: {
+function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, compact = false }: {
   match: DisplayMatch; prediction: { home: number | ''; away: number | '' }
-  onUpdate: (id: string, side: 'home' | 'away', v: string) => void; onClear: (id: string) => void
-  showGroup?: boolean; compact?: boolean; saving?: boolean
+  onUpdate: (id: string, side: 'home' | 'away', v: string) => void
+  onClear: (id: string) => void
+  showGroup?: boolean; compact?: boolean
 }) {
-  const isComplete = prediction.home !== '' && prediction.away !== ''
+  const hasPrediction = prediction.home !== '' && prediction.away !== ''
   return (
-    <div className="rounded-md transition-all" style={{ backgroundColor: BAIN.white, border: `1px solid ${isComplete ? BAIN.success + '40' : BAIN.grayBorder}`, padding: compact ? '14px 16px' : '20px' }}>
+    <div className="rounded-md transition-all" style={{ backgroundColor: BAIN.white, border: `1px solid ${hasPrediction ? BAIN.success + '50' : BAIN.grayBorder}`, padding: compact ? '12px 14px' : '20px' }}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
         <div className="flex items-center gap-2">
-          <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{showGroup && `GRUPO ${match.group} · `}{match.time}</span>
-          {saving && <span className="text-[10px] text-gray-400 uppercase">guardando…</span>}
-          {isComplete && !saving && (
-            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, letterSpacing: '0.06em' }}>
-              <Check size={10} strokeWidth={3} />GUARDADA
+          <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
+            {showGroup && `GRUPO ${match.group} · `}{match.shortDate} · {match.time}
+          </span>
+          {hasPrediction && (
+            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full" style={{ backgroundColor: BAIN.success }}>
+              <Check size={9} strokeWidth={3} color="white" />
             </span>
           )}
         </div>
@@ -363,22 +395,20 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
         <div className="flex items-center gap-2 justify-end">
           <div className="text-right hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.homeName}</p></div>
           <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />
-          <input type="number" min="0" max="20" placeholder="0" value={prediction.home} onChange={e => onUpdate(match.id, 'home', e.target.value)} className="w-14 h-11 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.homeName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => onUpdate(match.id, 'home', e.target.value)} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.homeName}`} />
         </div>
         <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
         <div className="flex items-center gap-2 justify-start">
-          <input type="number" min="0" max="20" placeholder="0" value={prediction.away} onChange={e => onUpdate(match.id, 'away', e.target.value)} className="w-14 h-11 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.awayName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => onUpdate(match.id, 'away', e.target.value)} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.awayName}`} />
           <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />
           <div className="hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.awayName}</p></div>
         </div>
       </div>
-      {!compact && (
-        <div className="flex items-center justify-between mt-4 pt-4" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
-          <p className="text-xs" style={{ color: BAIN.graySecondary }}>Tu predicción se guarda automáticamente</p>
-          {isComplete && <button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button>}
+      {!compact && hasPrediction && (
+        <div className="flex justify-end mt-3 pt-3" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+          <button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button>
         </div>
       )}
-      {compact && isComplete && <div className="flex justify-end mt-2"><button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button></div>}
     </div>
   )
 }
