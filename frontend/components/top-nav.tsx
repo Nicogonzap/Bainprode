@@ -24,7 +24,7 @@ const NAV_LINKS: { href: string; label: string; key: ActivePage }[] = [
   { href: '/predicciones', label: 'Predicciones', key: 'predicciones' },
   { href: '/especiales', label: 'Especiales', key: 'especiales' },
   { href: '/tabla', label: 'Resultados', key: 'tabla' },
-  { href: '/mi-torneo', label: 'Mis torneos', key: 'mi-torneo' },
+  { href: '/mi-torneo', label: 'Mi torneo', key: 'mi-torneo' },
 ]
 
 function detectActive(pathname: string): ActivePage | null {
