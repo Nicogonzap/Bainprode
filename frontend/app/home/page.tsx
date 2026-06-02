@@ -50,6 +50,7 @@ function grupoLabel(grupo_fase: string | null) {
 
 function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean }) {
   const hasScore = match.goles_local !== null && match.goles_visitante !== null
+  const lugar = match.ciudad || match.estadio || ''
   return (
     <div className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
       style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
@@ -65,7 +66,7 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
         </div>
         {showScore && hasScore ? (
           <span className="text-sm font-bold px-1" style={{ color: BAIN.black }}>
-            {match.goles_local} – {match.goles_visitante}
+            {match.goles_local} - {match.goles_visitante}
           </span>
         ) : (
           <span className="text-xs" style={{ color: BAIN.graySecondary }}>vs</span>
@@ -77,7 +78,9 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
           </span>
         </div>
       </div>
-      <span className="text-xs flex-shrink-0 ml-2" style={{ color: BAIN.graySecondary }}>{match.ciudad}</span>
+      {lugar && (
+        <span className="text-xs flex-shrink-0 ml-2" style={{ color: BAIN.graySecondary }}>{lugar}</span>
+      )}
     </div>
   )
 }
@@ -167,9 +170,7 @@ function CreateTorneoModal({ userId, onClose, onCreated }: {
             <div className="flex gap-3">
               <button type="button" onClick={onClose}
                 className="flex-1 py-2 rounded-md text-sm font-medium"
-                style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>
-                Cancelar
-              </button>
+                style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>Cancelar</button>
               <button type="button" onClick={handleCreate} disabled={loading}
                 className="flex-1 py-2 rounded-md text-sm font-bold transition-opacity"
                 style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: loading ? 0.7 : 1 }}>
@@ -193,9 +194,7 @@ function CreateTorneoModal({ userId, onClose, onCreated }: {
             </button>
             <Link href={`/torneo/${created.id}`} onClick={onClose}
               className="block w-full py-2 text-center rounded-md text-sm font-medium"
-              style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>
-              Ver torneo
-            </Link>
+              style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>Ver torneo</Link>
           </>
         )}
       </div>
@@ -240,34 +239,23 @@ function HomePageContent() {
   const now = new Date()
   const todayStr = now.toLocaleDateString('en-CA', { timeZone: TZ })
 
-  // Next 3 upcoming (for left card)
-  const upcomingMatches = partidos
-    .filter(m => new Date(m.fecha_hora) > now)
-    .slice(0, 3)
+  const upcomingMatches = partidos.filter(m => new Date(m.fecha_hora) > now).slice(0, 3)
   const nextMatch = upcomingMatches[0] ?? null
 
-  // --- Results section logic ---
-  // Partidos recientes: last 3, or all from last played day if >3
   const pastMatches = partidos
     .filter(m => new Date(m.fecha_hora) < now)
     .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
   const lastPlayedDate = pastMatches.length > 0 ? toArgDateStr(pastMatches[0].fecha_hora) : null
-  const lastDayMatches = lastPlayedDate
-    ? pastMatches.filter(m => toArgDateStr(m.fecha_hora) === lastPlayedDate)
-    : []
+  const lastDayMatches = lastPlayedDate ? pastMatches.filter(m => toArgDateStr(m.fecha_hora) === lastPlayedDate) : []
   const recentMatches = lastDayMatches.length > 3 ? lastDayMatches : pastMatches.slice(0, 3)
 
-  // Partidos de hoy
   const todayMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === todayStr)
 
-  // Próximos partidos: next 3, or all from next day with matches if >3
   const futureMatches = partidos
     .filter(m => new Date(m.fecha_hora) > now)
     .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime())
   const nextDate = futureMatches.length > 0 ? toArgDateStr(futureMatches[0].fecha_hora) : null
-  const nextDayMatches = nextDate
-    ? futureMatches.filter(m => toArgDateStr(m.fecha_hora) === nextDate)
-    : []
+  const nextDayMatches = nextDate ? futureMatches.filter(m => toArgDateStr(m.fecha_hora) === nextDate) : []
   const proximosMatches = nextDayMatches.length > 3 ? nextDayMatches : futureMatches.slice(0, 3)
 
   const nombreDisplay = profile?.nombre ?? profile?.nombre_usuario?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario'
@@ -296,9 +284,7 @@ function HomePageContent() {
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
             Hola, {nombreDisplay}
           </h1>
-          <p className="text-sm" style={{ color: BAIN.graySecondary }}>
-            Mundial 2026 · Prode Bain Buenos Aires
-          </p>
+          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Mundial 2026 · Prode Bain Buenos Aires</p>
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -329,7 +315,9 @@ function HomePageContent() {
                   <p className="text-sm font-medium mb-1" style={{ color: BAIN.black }}>
                     {formatDate(nextMatch.fecha_hora)} · {formatHour(nextMatch.fecha_hora)} ARG
                   </p>
-                  <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>{nextMatch.estadio}, {nextMatch.ciudad}</p>
+                  <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>
+                    {nextMatch.estadio}{nextMatch.ciudad ? `, ${nextMatch.ciudad}` : ''}
+                  </p>
                   <div className="flex items-center justify-around mb-6">
                     <div className="flex flex-col items-center gap-2">
                       <CountryFlag code={nextMatch.equipo_local.codigo_iso} size="lg" />
@@ -353,7 +341,7 @@ function HomePageContent() {
               </Link>
             </div>
 
-            {/* Próximos partidos */}
+            {/* Próximos partidos card */}
             <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500"
               style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '400ms', animationFillMode: 'backwards' }}>
               <h2 className="text-base font-bold tracking-tight mb-4" style={{ color: BAIN.black }}>Próximos partidos</h2>
@@ -362,23 +350,25 @@ function HomePageContent() {
               ) : upcomingMatches.length === 0 ? (
                 <p className="text-sm py-4" style={{ color: BAIN.graySecondary }}>No hay próximos partidos.</p>
               ) : (
-                <ul>
+                <ul className="space-y-1">
                   {upcomingMatches.map((m, i) => (
-                    <li key={m.id} className="flex items-center justify-between py-3 hover:bg-gray-50 -mx-2 px-2 rounded transition-colors"
+                    <li key={m.id} className="py-3 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
                       style={{ borderBottom: i < upcomingMatches.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
-                      <div className="flex items-center gap-3">
-                        <span className="w-20 text-xs font-bold" style={{ color: BAIN.graySecondary }}>
-                          {formatDate(m.fecha_hora)}
-                        </span>
-                        <div className="flex items-center gap-1.5">
+                      <div className="flex items-center justify-between mb-1.5">
+                        <span className="text-xs" style={{ color: BAIN.graySecondary }}>{formatDate(m.fecha_hora)}</span>
+                        <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }}>{grupoLabel(m.grupo_fase)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
                           <CountryFlag code={m.equipo_local.codigo_iso} size="sm" />
-                          <span className="text-xs font-medium" style={{ color: BAIN.black }}>vs</span>
+                          <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_local.nombre_pais}</span>
+                        </div>
+                        <span className="text-xs flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
+                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                          <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_visitante.nombre_pais}</span>
                           <CountryFlag code={m.equipo_visitante.codigo_iso} size="sm" />
                         </div>
                       </div>
-                      <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
-                        {grupoLabel(m.grupo_fase)}
-                      </span>
                     </li>
                   ))}
                 </ul>
@@ -401,9 +391,7 @@ function HomePageContent() {
                   {torneos.map(t => (
                     <div key={t.id} className="py-2" style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
                       <p className="text-sm font-bold mb-0.5" style={{ color: BAIN.black }}>{t.nombre}</p>
-                      <Link href={`/torneo/${t.id}`} className="text-xs font-medium hover:underline" style={{ color: BAIN.red }}>
-                        Ver ranking →
-                      </Link>
+                      <Link href={`/torneo/${t.id}`} className="text-xs font-medium hover:underline" style={{ color: BAIN.red }}>Ver ranking →</Link>
                     </div>
                   ))}
                 </div>
