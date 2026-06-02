@@ -15,7 +15,7 @@ const BAIN = {
   graySecondary: '#666666',
 } as const
 
-const BAIN_LOGO_SYMBOL = 'https://logos-world.net/wp-content/uploads/2025/04/Bain-Company-Symbol.png'
+const BAIN_LOGO_SYMBOL = '/favicon.png'
 
 type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo'
 
