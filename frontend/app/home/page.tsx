@@ -37,7 +37,7 @@ function toArgDateStr(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ })
 }
 function formatHour(iso: string) {
-  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: TZ }).replace(':', '.')
 }
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ })
