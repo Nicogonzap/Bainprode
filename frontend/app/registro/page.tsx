@@ -15,8 +15,7 @@ const BAIN = {
   graySecondary: '#666666',
 } as const
 
-const BAIN_LOGO_FULL =
-  'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcQFh4ztKgk26sNf9iYsiT3neD-akow1st08-g&s'
+const BAIN_LOGO_FULL = '/favicon.png'
 
 type Tenure = 'AC' | 'SAC' | 'C' | 'M' | 'SM' | 'AP' | 'P'
 
