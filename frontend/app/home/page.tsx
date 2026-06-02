@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
-import { Target, Trophy, Calendar } from 'lucide-react'
+import { Target, Trophy, X, Copy, Check } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -21,76 +21,242 @@ const BAIN = {
   grayTertiary: '#999999',
 } as const
 
-type UserProfile = {
-  nombre: string | null
-  apellido: string | null
-  nombre_usuario: string | null
+const TZ = 'America/Argentina/Buenos_Aires'
+
+type Equipo = { id: string; nombre_pais: string; codigo_iso: string }
+type Partido = {
+  id: string; fecha_hora: string; estadio: string; ciudad: string
+  fase: string; grupo_fase: string; estado: string
+  goles_local: number | null; goles_visitante: number | null
+  equipo_local: Equipo; equipo_visitante: Equipo
+}
+type Torneo = { id: string; nombre: string; invite_code: string; creado_por: string }
+type UserProfile = { nombre: string | null; apellido: string | null; nombre_usuario: string | null }
+
+function toArgDateStr(iso: string) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ })
+}
+function formatHour(iso: string) {
+  return new Date(iso).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: TZ })
+}
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ })
 }
 
-type UpcomingMatch = {
-  id: string
-  date: string
-  home: string
-  homeName: string
-  away: string
-  awayName: string
-  phase: string
+function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean }) {
+  const hasScore = match.goles_local !== null && match.goles_visitante !== null
+  return (
+    <div className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
+      style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
+      <div className="flex items-center gap-3">
+        <span className="text-xs font-bold w-12 flex-shrink-0" style={{ color: BAIN.graySecondary }}>
+          {formatHour(match.fecha_hora)}
+        </span>
+        <div className="flex items-center gap-2">
+          <CountryFlag code={match.equipo_local.codigo_iso} size="sm" />
+          <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
+            {match.equipo_local.codigo_iso}
+          </span>
+        </div>
+        {showScore && hasScore ? (
+          <span className="text-sm font-bold px-1" style={{ color: BAIN.black }}>
+            {match.goles_local} – {match.goles_visitante}
+          </span>
+        ) : (
+          <span className="text-xs" style={{ color: BAIN.graySecondary }}>vs</span>
+        )}
+        <div className="flex items-center gap-2">
+          <CountryFlag code={match.equipo_visitante.codigo_iso} size="sm" />
+          <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
+            {match.equipo_visitante.codigo_iso}
+          </span>
+        </div>
+      </div>
+      <span className="text-xs flex-shrink-0 ml-2" style={{ color: BAIN.graySecondary }}>{match.ciudad}</span>
+    </div>
+  )
 }
 
-const UPCOMING_STATIC: UpcomingMatch[] = [
-  { id: '1', date: '15 JUN', home: 'ARG', homeName: 'Argentina', away: 'ARS', awayName: 'Arabia Saudita', phase: 'GRUPO J' },
-  { id: '2', date: '16 JUN', home: 'BRA', homeName: 'Brasil', away: 'CMR', awayName: 'Camerún', phase: 'GRUPO F' },
-  { id: '3', date: '17 JUN', home: 'ARG', homeName: 'Argentina', away: 'MEX', awayName: 'México', phase: 'GRUPO J' },
-]
+function DateGroup({ label, matches, showScore }: { label: string; matches: Partido[]; showScore?: boolean }) {
+  return (
+    <div>
+      <h3 className="text-xs font-bold uppercase mb-3 tracking-widest" style={{ color: BAIN.graySecondary }}>
+        {label}
+      </h3>
+      {matches.length === 0 ? (
+        <p className="text-sm py-2" style={{ color: BAIN.grayTertiary }}>Sin partidos.</p>
+      ) : (
+        matches.map(m => <MatchRow key={m.id} match={m} showScore={showScore} />)
+      )}
+    </div>
+  )
+}
+
+function CreateTorneoModal({ userId, onClose, onCreated }: {
+  userId: string; onClose: () => void; onCreated: (t: Torneo) => void
+}) {
+  const { toast } = useToast()
+  const [name, setName] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+  const [created, setCreated] = useState<Torneo | null>(null)
+  const [copied, setCopied] = useState(false)
+
+  const inviteUrl = created && typeof window !== 'undefined'
+    ? `${window.location.origin}/torneo/join/${created.invite_code}`
+    : ''
+
+  const handleCreate = async () => {
+    if (!name.trim()) { setError('Ingresá un nombre para el torneo'); return }
+    setLoading(true); setError('')
+    try {
+      const res = await fetch('/api/torneos', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ nombre: name.trim(), creado_por: userId }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al crear torneo')
+      setCreated(json.torneo)
+      onCreated(json.torneo)
+    } catch (e: any) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(inviteUrl)
+      setCopied(true)
+      toast({ message: 'Link copiado', type: 'success', duration: 2000 })
+      setTimeout(() => setCopied(false), 2000)
+    } catch { toast({ message: 'No se pudo copiar', type: 'error' }) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}
+      onClick={e => { if (e.target === e.currentTarget) onClose() }}>
+      <div className="w-full max-w-md rounded-md shadow-lg p-6" style={{ backgroundColor: BAIN.white }}>
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="text-lg font-bold" style={{ color: BAIN.black }}>
+            {created ? 'Torneo creado' : 'Crear nuevo torneo'}
+          </h2>
+          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-gray-100">
+            <X size={18} style={{ color: BAIN.graySecondary }} />
+          </button>
+        </div>
+
+        {!created ? (
+          <>
+            <label className="block text-sm font-medium mb-2" style={{ color: BAIN.black }}>
+              Nombre del torneo
+            </label>
+            <input type="text" value={name} autoFocus
+              onChange={e => { setName(e.target.value); setError('') }}
+              onKeyDown={e => e.key === 'Enter' && handleCreate()}
+              placeholder="Ej: Torneo Marketing 2026"
+              className="w-full px-3 py-2 rounded-md text-sm focus:outline-none mb-4"
+              style={{ border: `1px solid ${error ? BAIN.red : BAIN.grayBorder}` }}
+            />
+            {error && <p className="text-xs mb-3" style={{ color: BAIN.red }}>{error}</p>}
+            <div className="flex gap-3">
+              <button type="button" onClick={onClose}
+                className="flex-1 py-2 rounded-md text-sm font-medium"
+                style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>
+                Cancelar
+              </button>
+              <button type="button" onClick={handleCreate} disabled={loading}
+                className="flex-1 py-2 rounded-md text-sm font-bold transition-opacity"
+                style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: loading ? 0.7 : 1 }}>
+                {loading ? 'Creando...' : 'Crear torneo'}
+              </button>
+            </div>
+          </>
+        ) : (
+          <>
+            <p className="text-sm mb-4" style={{ color: BAIN.graySecondary }}>
+              <span className="font-bold" style={{ color: BAIN.black }}>{created.nombre}</span> fue creado.
+              Compartí este link:
+            </p>
+            <div className="rounded-md px-3 py-2.5 mb-3 break-all"
+              style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }}>
+              <p className="text-xs font-mono" style={{ color: BAIN.black }}>{inviteUrl}</p>
+            </div>
+            <button type="button" onClick={handleCopy}
+              className="w-full py-2.5 px-4 rounded-md text-sm font-bold flex items-center justify-center gap-2 mb-3"
+              style={{ backgroundColor: copied ? BAIN.black : BAIN.red, color: BAIN.white }}>
+              {copied ? <><Check size={16} />Copiado</> : <><Copy size={16} />Copiar link</>}
+            </button>
+            <Link href={`/torneo/${created.id}`} onClick={onClose}
+              className="block w-full py-2 text-center rounded-md text-sm font-medium"
+              style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>
+              Ver torneo
+            </Link>
+          </>
+        )}
+      </div>
+    </div>
+  )
+}
 
 function HomePageContent() {
-  const { toast } = useToast()
   const { user } = useAuth()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [prediccionesCount, setPrediccionesCount] = useState(0)
   const [puntosTotales, setPuntosTotales] = useState<number | null>(null)
+  const [partidos, setPartidos] = useState<Partido[]>([])
+  const [loadingPartidos, setLoadingPartidos] = useState(true)
+  const [torneos, setTorneos] = useState<Torneo[]>([])
+  const [showCreateModal, setShowCreateModal] = useState(false)
 
   useEffect(() => {
     if (!user) return
 
-    // Cargar perfil
-    supabase
-      .from('usuarios')
-      .select('nombre, apellido, nombre_usuario')
-      .eq('id', user.id)
-      .maybeSingle()
-      .then(({ data }) => {
-        if (data) setProfile(data)
-      })
+    supabase.from('usuarios').select('nombre, apellido, nombre_usuario')
+      .eq('id', user.id).maybeSingle()
+      .then(({ data }) => { if (data) setProfile(data) })
 
-    // Contar predicciones del usuario
-    supabase
-      .from('predicciones')
-      .select('id', { count: 'exact', head: true })
+    supabase.from('predicciones').select('id', { count: 'exact', head: true })
       .eq('usuario_id', user.id)
       .then(({ count }) => setPrediccionesCount(count ?? 0))
 
-    // Puntos totales
-    supabase
-      .from('historial_puntos')
-      .select('puntos')
+    supabase.from('historial_puntos').select('puntos')
       .eq('usuario_id', user.id)
       .then(({ data }) => {
-        if (data) {
-          const total = data.reduce((sum, r) => sum + (r.puntos ?? 0), 0)
-          setPuntosTotales(total)
-        }
+        if (data) setPuntosTotales(data.reduce((s: number, r: any) => s + (r.puntos ?? 0), 0))
       })
+
+    fetch('/api/partidos')
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setPartidos(data) })
+      .catch(() => {})
+      .finally(() => setLoadingPartidos(false))
+
+    fetch(`/api/torneos?usuario_id=${user.id}`)
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setTorneos(data) })
+      .catch(() => {})
   }, [user])
 
-  const nombreDisplay =
-    profile?.nombre && profile?.apellido
-      ? profile.nombre
-      : profile?.nombre_usuario?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario'
+  const now = new Date()
+  const todayStr = now.toLocaleDateString('en-CA', { timeZone: TZ })
+  const yesterdayStr = new Date(now.getTime() - 86400000).toLocaleDateString('en-CA', { timeZone: TZ })
+  const tomorrowStr = new Date(now.getTime() + 86400000).toLocaleDateString('en-CA', { timeZone: TZ })
+
+  const upcomingMatches = partidos.filter(m => new Date(m.fecha_hora) > now).slice(0, 3)
+  const nextMatch = upcomingMatches[0] ?? null
+  const yesterdayMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === yesterdayStr)
+  const todayMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === todayStr)
+  const tomorrowMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === tomorrowStr)
+
+  const nombreDisplay = profile?.nombre ?? profile?.nombre_usuario?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario'
 
   const kpis = [
-    { label: 'PUNTOS TOTALES', value: puntosTotales !== null ? String(puntosTotales) : '0', caption: '0 partidos jugados' },
-    { label: 'POSICIÓN EN TU TORNEO', value: '—', caption: 'Torneo BNA Bain 2026' },
+    { label: 'PUNTOS TOTALES', value: String(puntosTotales ?? 0), caption: '0 partidos jugados' },
+    { label: 'POSICIÓN EN TU TORNEO', value: '—', caption: torneos[0]?.nombre ?? 'Sin torneo' },
     { label: 'PREDICCIONES CARGADAS', value: `${prediccionesCount} / 104`, caption: `Faltan ${104 - prediccionesCount} partidos` },
     { label: '% DE ACIERTOS', value: '—', caption: 'Disponible cuando empiece el Mundial' },
   ]
@@ -99,23 +265,28 @@ function HomePageContent() {
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: BAIN.grayBg }}>
       <TopNav activePage="home" />
 
+      {showCreateModal && user && (
+        <CreateTorneoModal
+          userId={user.id}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={t => setTorneos(prev => [t, ...prev])}
+        />
+      )}
+
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
-        {/* Hero */}
         <section className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
             Hola, {nombreDisplay}
           </h1>
           <p className="text-sm" style={{ color: BAIN.graySecondary }}>
-            Faltan{' '}
-            <span className="font-bold" style={{ color: BAIN.red }}>10 días</span>{' '}
-            para el primer partido del Mundial.
+            Mundial 2026 · Prode Bain Buenos Aires
           </p>
         </section>
 
-        {/* KPI grid */}
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((k, i) => (
-            <div key={k.label} className="rounded-md p-5 transition-all hover:shadow-sm animate-in fade-in slide-in-from-bottom-2" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${i * 80}ms`, animationFillMode: 'backwards', animationDuration: '500ms' }}>
+            <div key={k.label} className="rounded-md p-5 transition-all hover:shadow-sm animate-in fade-in slide-in-from-bottom-2"
+              style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${i * 80}ms`, animationFillMode: 'backwards', animationDuration: '500ms' }}>
               <p className="text-xs font-medium mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{k.label}</p>
               <p className="text-3xl font-bold tracking-tight mb-1" style={{ color: BAIN.black }}>{k.value}</p>
               <p className="text-xs" style={{ color: BAIN.graySecondary }}>{k.caption}</p>
@@ -123,80 +294,126 @@ function HomePageContent() {
           ))}
         </section>
 
-        {/* Two column layout */}
         <section className="grid grid-cols-1 lg:grid-cols-5 gap-6 mb-8">
           <div className="lg:col-span-3 flex flex-col gap-6">
             {/* Próximo partido */}
-            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '300ms', animationFillMode: 'backwards' }}>
+            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500"
+              style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '300ms', animationFillMode: 'backwards' }}>
               <div className="flex items-center gap-2 mb-5">
                 <Target size={18} style={{ color: BAIN.black }} strokeWidth={1.75} />
                 <h2 className="text-base font-bold tracking-tight" style={{ color: BAIN.black }}>Próximo partido a predecir</h2>
               </div>
-              <p className="text-xs font-medium mb-2" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>FASE DE GRUPOS · GRUPO J</p>
-              <p className="text-sm font-medium mb-1" style={{ color: BAIN.black }}>Lunes 15 de junio · 21:00 ARG</p>
-              <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>SoFi Stadium, Los Angeles</p>
-              <div className="flex items-center justify-around mb-6">
-                <div className="flex flex-col items-center gap-2">
-                  <CountryFlag code="ARG" size="lg" />
-                  <span className="text-sm font-bold" style={{ color: BAIN.black }}>Argentina</span>
-                </div>
-                <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
-                <div className="flex flex-col items-center gap-2">
-                  <CountryFlag code="ARS" size="lg" />
-                  <span className="text-sm font-bold" style={{ color: BAIN.black }}>Arabia Saudita</span>
-                </div>
-              </div>
-              <Link href="/predicciones" className="block w-full text-center font-bold py-2.5 px-4 rounded-md text-sm transition-colors" style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
+              {nextMatch ? (
+                <>
+                  <p className="text-xs font-medium mb-2" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
+                    {nextMatch.grupo_fase?.toUpperCase()} · {nextMatch.fase?.toUpperCase()}
+                  </p>
+                  <p className="text-sm font-medium mb-1" style={{ color: BAIN.black }}>
+                    {formatDate(nextMatch.fecha_hora)} · {formatHour(nextMatch.fecha_hora)} ARG
+                  </p>
+                  <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>{nextMatch.estadio}, {nextMatch.ciudad}</p>
+                  <div className="flex items-center justify-around mb-6">
+                    <div className="flex flex-col items-center gap-2">
+                      <CountryFlag code={nextMatch.equipo_local.codigo_iso} size="lg" />
+                      <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_local.nombre_pais}</span>
+                    </div>
+                    <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
+                    <div className="flex flex-col items-center gap-2">
+                      <CountryFlag code={nextMatch.equipo_visitante.codigo_iso} size="lg" />
+                      <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_visitante.nombre_pais}</span>
+                    </div>
+                  </div>
+                </>
+              ) : (
+                <p className="text-sm mb-6 py-4" style={{ color: BAIN.graySecondary }}>
+                  {loadingPartidos ? 'Cargando...' : 'No hay próximos partidos disponibles.'}
+                </p>
+              )}
+              <Link href="/predicciones" className="block w-full text-center font-bold py-2.5 px-4 rounded-md text-sm"
+                style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
                 Cargar predicción
               </Link>
             </div>
 
             {/* Próximos partidos */}
-            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '400ms', animationFillMode: 'backwards' }}>
+            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500"
+              style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '400ms', animationFillMode: 'backwards' }}>
               <h2 className="text-base font-bold tracking-tight mb-4" style={{ color: BAIN.black }}>Próximos partidos</h2>
-              <ul>
-                {UPCOMING_STATIC.map((m, i) => (
-                  <li key={m.id} className="flex items-center justify-between py-3 transition-colors hover:bg-gray-50 -mx-2 px-2 rounded" style={{ borderBottom: i < UPCOMING_STATIC.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
-                    <div className="flex items-center gap-4">
-                      <span className="w-14 text-xs font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{m.date}</span>
-                      <div className="flex items-center gap-2">
-                        <CountryFlag code={m.home} size="sm" />
-                        <span className="text-sm font-medium" style={{ color: BAIN.black }}>vs</span>
-                        <CountryFlag code={m.away} size="sm" />
+              {loadingPartidos ? (
+                <p className="text-sm py-4" style={{ color: BAIN.graySecondary }}>Cargando...</p>
+              ) : upcomingMatches.length === 0 ? (
+                <p className="text-sm py-4" style={{ color: BAIN.graySecondary }}>No hay próximos partidos.</p>
+              ) : (
+                <ul>
+                  {upcomingMatches.map((m, i) => (
+                    <li key={m.id} className="flex items-center justify-between py-3 transition-colors hover:bg-gray-50 -mx-2 px-2 rounded"
+                      style={{ borderBottom: i < upcomingMatches.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
+                      <div className="flex items-center gap-4">
+                        <span className="w-20 text-xs font-bold" style={{ color: BAIN.graySecondary }}>
+                          {formatDate(m.fecha_hora)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          <CountryFlag code={m.equipo_local.codigo_iso} size="sm" />
+                          <span className="text-xs font-medium" style={{ color: BAIN.black }}>vs</span>
+                          <CountryFlag code={m.equipo_visitante.codigo_iso} size="sm" />
+                        </div>
                       </div>
-                    </div>
-                    <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{m.phase}</span>
-                  </li>
-                ))}
-              </ul>
+                      <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
+                        {m.grupo_fase}
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
             </div>
           </div>
 
-          {/* RIGHT */}
+          {/* Tus torneos */}
           <div className="lg:col-span-2">
-            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '500ms', animationFillMode: 'backwards' }}>
+            <div className="rounded-md p-6 transition-shadow hover:shadow-sm animate-in fade-in duration-500"
+              style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '500ms', animationFillMode: 'backwards' }}>
               <div className="flex items-center gap-2 mb-5">
                 <Trophy size={18} style={{ color: BAIN.black }} strokeWidth={1.75} />
                 <h2 className="text-base font-bold tracking-tight" style={{ color: BAIN.black }}>Tus torneos</h2>
               </div>
-              <div className="py-3">
-                <p className="text-sm font-bold mb-1" style={{ color: BAIN.black }}>Torneo BNA Bain 2026</p>
-                <Link href="/mi-torneo" className="text-xs font-medium hover:underline" style={{ color: BAIN.red }}>Ver detalle →</Link>
-              </div>
-              <button type="button" onClick={() => toast({ message: 'Funcionalidad en desarrollo', type: 'info' })} className="w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors mt-4" style={{ backgroundColor: BAIN.white, color: BAIN.black, border: `1px solid ${BAIN.black}` }}>
+              {torneos.length === 0 ? (
+                <p className="text-sm py-2 mb-3" style={{ color: BAIN.graySecondary }}>Aún no participás en ningún torneo.</p>
+              ) : (
+                <div className="mb-4 space-y-1">
+                  {torneos.map(t => (
+                    <div key={t.id} className="py-2" style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
+                      <p className="text-sm font-bold mb-0.5" style={{ color: BAIN.black }}>{t.nombre}</p>
+                      <Link href={`/torneo/${t.id}`} className="text-xs font-medium hover:underline" style={{ color: BAIN.red }}>
+                        Ver ranking →
+                      </Link>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button type="button" onClick={() => setShowCreateModal(true)}
+                className="w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
+                style={{ backgroundColor: BAIN.white, color: BAIN.black, border: `1px solid ${BAIN.black}` }}>
                 + Crear nuevo torneo
               </button>
             </div>
           </div>
         </section>
 
-        {/* Recent results */}
-        <section className="rounded-md p-6 animate-in fade-in duration-500" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '600ms', animationFillMode: 'backwards' }}>
-          <h2 className="text-base font-bold tracking-tight mb-6" style={{ color: BAIN.black }}>Últimos resultados</h2>
-          <div className="flex flex-col items-center justify-center py-10 text-center">
-            <Calendar size={40} strokeWidth={1.5} style={{ color: BAIN.grayTertiary }} className="mb-4" />
-            <p className="text-sm" style={{ color: BAIN.graySecondary }}>Los resultados van a aparecer cuando empiece el Mundial el 11 de junio.</p>
-          </div>
+        {/* Resultados y Próximos Partidos */}
+        <section className="rounded-md p-6 animate-in fade-in duration-500"
+          style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '600ms', animationFillMode: 'backwards' }}>
+          <h2 className="text-base font-bold tracking-tight mb-6" style={{ color: BAIN.black }}>
+            Resultados y Próximos Partidos
+          </h2>
+          {loadingPartidos ? (
+            <p className="text-sm py-6 text-center" style={{ color: BAIN.graySecondary }}>Cargando partidos...</p>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <DateGroup label="Partidos de ayer" matches={yesterdayMatches} showScore />
+              <DateGroup label="Partidos de hoy" matches={todayMatches} showScore />
+              <DateGroup label="Partidos de mañana" matches={tomorrowMatches} />
+            </div>
+          )}
         </section>
       </main>
 
@@ -206,9 +423,5 @@ function HomePageContent() {
 }
 
 export default function HomePage() {
-  return (
-    <ToastProvider>
-      <HomePageContent />
-    </ToastProvider>
-  )
+  return <ToastProvider><HomePageContent /></ToastProvider>
 }

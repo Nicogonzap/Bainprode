@@ -40,11 +40,11 @@ CREATE POLICY "Usuarios pueden actualizar sus predicciones especiales"
 -- 4. RLS para usuarios (perfil propio)
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY IF NOT EXISTS "Usuarios pueden ver su propio perfil"
+CREATE POLICY "Usuarios pueden ver su propio perfil"
   ON public.usuarios FOR SELECT
   USING (auth.uid() = id);
 
-CREATE POLICY IF NOT EXISTS "Usuarios pueden actualizar su propio perfil"
+CREATE POLICY "Usuarios pueden actualizar su propio perfil"
   ON public.usuarios FOR UPDATE
   USING (auth.uid() = id);
 

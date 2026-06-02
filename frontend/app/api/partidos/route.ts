@@ -11,11 +11,11 @@ function getServerClient() {
 
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const fase = searchParams.get('fase') ?? 'grupos'
+  const fase = searchParams.get('fase')
 
   try {
     const supabase = getServerClient()
-    const { data, error } = await supabase
+    let query = supabase
       .from('partidos')
       .select(`
         id,
@@ -30,9 +30,11 @@ export async function GET(request: Request) {
         equipo_local:equipos!equipo_local_id (id, nombre_pais, codigo_iso),
         equipo_visitante:equipos!equipo_visitante_id (id, nombre_pais, codigo_iso)
       `)
-      .eq('fase', fase)
       .order('fecha_hora', { ascending: true })
 
+    if (fase) query = (query as any).eq('fase', fase)
+
+    const { data, error } = await query
     if (error) throw error
     return NextResponse.json({ data: data ?? [] })
   } catch (err: any) {

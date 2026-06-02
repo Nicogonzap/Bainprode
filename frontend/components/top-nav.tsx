@@ -1,10 +1,10 @@
-'use client'
+﻿'use client'
 
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { ChevronDown, Menu, X } from 'lucide-react'
+import { Menu, X } from 'lucide-react'
 
 const BAIN = {
   red: '#CC0000',
@@ -15,8 +15,6 @@ const BAIN = {
   graySecondary: '#666666',
 } as const
 
-// Logo oficial de Bain (símbolo solo, sin texto). Usamos URL externa por velocidad.
-// TODO: si queremos optimizar, descargar a /public/logo-bain.png y cambiar el src.
 const BAIN_LOGO_SYMBOL = 'https://logos-world.net/wp-content/uploads/2025/04/Bain-Company-Symbol.png'
 
 type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo'
@@ -97,22 +95,8 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
           })}
         </nav>
 
-        {/* Right: avatar (desktop) / hamburger (mobile) */}
-        <div className="flex items-center gap-3">
-          <button
-            type="button"
-            className="hidden md:flex items-center gap-2 transition-opacity hover:opacity-80"
-            aria-label="Menú de usuario"
-          >
-            <span
-              className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-              style={{ backgroundColor: BAIN.grayBg, color: BAIN.black }}
-            >
-              SM
-            </span>
-            <ChevronDown size={16} style={{ color: BAIN.graySecondary }} />
-          </button>
-
+        {/* Right: hamburger (mobile only) */}
+        <div className="flex items-center">
           <button
             type="button"
             className="md:hidden flex items-center justify-center w-9 h-9 rounded-md transition-colors"
@@ -150,20 +134,6 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
                 </Link>
               )
             })}
-            <div
-              className="flex items-center gap-2 py-3 pl-3 mt-2"
-              style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}
-            >
-              <span
-                className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold"
-                style={{ backgroundColor: BAIN.grayBg, color: BAIN.black }}
-              >
-                SM
-              </span>
-              <span className="text-sm" style={{ color: BAIN.black }}>
-                Santiago Matheu
-              </span>
-            </div>
           </nav>
         </div>
       )}
