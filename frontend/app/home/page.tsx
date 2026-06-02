@@ -42,6 +42,11 @@ function formatHour(iso: string) {
 function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('es-AR', { weekday: 'short', day: 'numeric', month: 'short', timeZone: TZ })
 }
+function grupoLabel(grupo_fase: string | null) {
+  if (!grupo_fase) return ''
+  const upper = grupo_fase.toUpperCase()
+  return upper.startsWith('GRUPO') ? upper : `Grupo ${upper}`
+}
 
 function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean }) {
   const hasScore = match.goles_local !== null && match.goles_visitante !== null
@@ -52,7 +57,7 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
         <span className="text-xs font-bold w-12 flex-shrink-0" style={{ color: BAIN.graySecondary }}>
           {formatHour(match.fecha_hora)}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <CountryFlag code={match.equipo_local.codigo_iso} size="sm" />
           <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
             {match.equipo_local.codigo_iso}
@@ -65,7 +70,7 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
         ) : (
           <span className="text-xs" style={{ color: BAIN.graySecondary }}>vs</span>
         )}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-1.5">
           <CountryFlag code={match.equipo_visitante.codigo_iso} size="sm" />
           <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
             {match.equipo_visitante.codigo_iso}
@@ -148,12 +153,9 @@ function CreateTorneoModal({ userId, onClose, onCreated }: {
             <X size={18} style={{ color: BAIN.graySecondary }} />
           </button>
         </div>
-
         {!created ? (
           <>
-            <label className="block text-sm font-medium mb-2" style={{ color: BAIN.black }}>
-              Nombre del torneo
-            </label>
+            <label className="block text-sm font-medium mb-2" style={{ color: BAIN.black }}>Nombre del torneo</label>
             <input type="text" value={name} autoFocus
               onChange={e => { setName(e.target.value); setError('') }}
               onKeyDown={e => e.key === 'Enter' && handleCreate()}
@@ -178,8 +180,7 @@ function CreateTorneoModal({ userId, onClose, onCreated }: {
         ) : (
           <>
             <p className="text-sm mb-4" style={{ color: BAIN.graySecondary }}>
-              <span className="font-bold" style={{ color: BAIN.black }}>{created.nombre}</span> fue creado.
-              Compartí este link:
+              <span className="font-bold" style={{ color: BAIN.black }}>{created.nombre}</span> fue creado. Compartí este link:
             </p>
             <div className="rounded-md px-3 py-2.5 mb-3 break-all"
               style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }}>
@@ -214,27 +215,22 @@ function HomePageContent() {
 
   useEffect(() => {
     if (!user) return
-
     supabase.from('usuarios').select('nombre, apellido, nombre_usuario')
       .eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data) setProfile(data) })
-
     supabase.from('predicciones').select('id', { count: 'exact', head: true })
       .eq('usuario_id', user.id)
       .then(({ count }) => setPrediccionesCount(count ?? 0))
-
     supabase.from('historial_puntos').select('puntos')
       .eq('usuario_id', user.id)
       .then(({ data }) => {
         if (data) setPuntosTotales(data.reduce((s: number, r: any) => s + (r.puntos ?? 0), 0))
       })
-
     fetch('/api/partidos')
       .then(r => r.json())
       .then(({ data }) => { if (data) setPartidos(data) })
       .catch(() => {})
       .finally(() => setLoadingPartidos(false))
-
     fetch(`/api/torneos?usuario_id=${user.id}`)
       .then(r => r.json())
       .then(({ data }) => { if (data) setTorneos(data) })
@@ -243,14 +239,36 @@ function HomePageContent() {
 
   const now = new Date()
   const todayStr = now.toLocaleDateString('en-CA', { timeZone: TZ })
-  const yesterdayStr = new Date(now.getTime() - 86400000).toLocaleDateString('en-CA', { timeZone: TZ })
-  const tomorrowStr = new Date(now.getTime() + 86400000).toLocaleDateString('en-CA', { timeZone: TZ })
 
-  const upcomingMatches = partidos.filter(m => new Date(m.fecha_hora) > now).slice(0, 3)
+  // Next 3 upcoming (for left card)
+  const upcomingMatches = partidos
+    .filter(m => new Date(m.fecha_hora) > now)
+    .slice(0, 3)
   const nextMatch = upcomingMatches[0] ?? null
-  const yesterdayMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === yesterdayStr)
+
+  // --- Results section logic ---
+  // Partidos recientes: last 3, or all from last played day if >3
+  const pastMatches = partidos
+    .filter(m => new Date(m.fecha_hora) < now)
+    .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+  const lastPlayedDate = pastMatches.length > 0 ? toArgDateStr(pastMatches[0].fecha_hora) : null
+  const lastDayMatches = lastPlayedDate
+    ? pastMatches.filter(m => toArgDateStr(m.fecha_hora) === lastPlayedDate)
+    : []
+  const recentMatches = lastDayMatches.length > 3 ? lastDayMatches : pastMatches.slice(0, 3)
+
+  // Partidos de hoy
   const todayMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === todayStr)
-  const tomorrowMatches = partidos.filter(m => toArgDateStr(m.fecha_hora) === tomorrowStr)
+
+  // Próximos partidos: next 3, or all from next day with matches if >3
+  const futureMatches = partidos
+    .filter(m => new Date(m.fecha_hora) > now)
+    .sort((a, b) => new Date(a.fecha_hora).getTime() - new Date(b.fecha_hora).getTime())
+  const nextDate = futureMatches.length > 0 ? toArgDateStr(futureMatches[0].fecha_hora) : null
+  const nextDayMatches = nextDate
+    ? futureMatches.filter(m => toArgDateStr(m.fecha_hora) === nextDate)
+    : []
+  const proximosMatches = nextDayMatches.length > 3 ? nextDayMatches : futureMatches.slice(0, 3)
 
   const nombreDisplay = profile?.nombre ?? profile?.nombre_usuario?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario'
 
@@ -306,7 +324,7 @@ function HomePageContent() {
               {nextMatch ? (
                 <>
                   <p className="text-xs font-medium mb-2" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
-                    {nextMatch.grupo_fase?.toUpperCase()} · {nextMatch.fase?.toUpperCase()}
+                    {grupoLabel(nextMatch.grupo_fase)} · {nextMatch.fase === 'grupos' ? 'Fase de Grupos' : nextMatch.fase?.toUpperCase()}
                   </p>
                   <p className="text-sm font-medium mb-1" style={{ color: BAIN.black }}>
                     {formatDate(nextMatch.fecha_hora)} · {formatHour(nextMatch.fecha_hora)} ARG
@@ -346,20 +364,20 @@ function HomePageContent() {
               ) : (
                 <ul>
                   {upcomingMatches.map((m, i) => (
-                    <li key={m.id} className="flex items-center justify-between py-3 transition-colors hover:bg-gray-50 -mx-2 px-2 rounded"
+                    <li key={m.id} className="flex items-center justify-between py-3 hover:bg-gray-50 -mx-2 px-2 rounded transition-colors"
                       style={{ borderBottom: i < upcomingMatches.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
-                      <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-3">
                         <span className="w-20 text-xs font-bold" style={{ color: BAIN.graySecondary }}>
                           {formatDate(m.fecha_hora)}
                         </span>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1.5">
                           <CountryFlag code={m.equipo_local.codigo_iso} size="sm" />
                           <span className="text-xs font-medium" style={{ color: BAIN.black }}>vs</span>
                           <CountryFlag code={m.equipo_visitante.codigo_iso} size="sm" />
                         </div>
                       </div>
                       <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
-                        {m.grupo_fase}
+                        {grupoLabel(m.grupo_fase)}
                       </span>
                     </li>
                   ))}
@@ -391,7 +409,7 @@ function HomePageContent() {
                 </div>
               )}
               <button type="button" onClick={() => setShowCreateModal(true)}
-                className="w-full py-2.5 px-4 rounded-md text-sm font-medium transition-colors"
+                className="w-full py-2.5 px-4 rounded-md text-sm font-medium"
                 style={{ backgroundColor: BAIN.white, color: BAIN.black, border: `1px solid ${BAIN.black}` }}>
                 + Crear nuevo torneo
               </button>
@@ -409,9 +427,9 @@ function HomePageContent() {
             <p className="text-sm py-6 text-center" style={{ color: BAIN.graySecondary }}>Cargando partidos...</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <DateGroup label="Partidos de ayer" matches={yesterdayMatches} showScore />
+              <DateGroup label="Partidos recientes" matches={recentMatches} showScore />
               <DateGroup label="Partidos de hoy" matches={todayMatches} showScore />
-              <DateGroup label="Partidos de mañana" matches={tomorrowMatches} />
+              <DateGroup label="Próximos partidos" matches={proximosMatches} />
             </div>
           )}
         </section>

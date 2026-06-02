@@ -1,32 +1,45 @@
-'use client'
+﻿'use client'
 
-/**
- * <CountryFlag />
- *
- * Renderiza un cuadrado con los colores de la bandera de un país.
- * Si el país no se encuentra en el diccionario, cae a un cuadrado gris neutro.
- *
- * Uso:
- *   <CountryFlag code="ARG" />              // tamaño default (md)
- *   <CountryFlag code="BRA" size="lg" />    // grande
- *   <CountryFlag code="MEX" size="sm" />    // chico
- *   <CountryFlag code="ARG" showCode />     // muestra el código encima
- */
+const ISO3_TO_ISO2: Record<string, string> = {
+  ARG: 'ar', BRA: 'br', MEX: 'mx', USA: 'us', CAN: 'ca',
+  FRA: 'fr', GER: 'de', ESP: 'es', POR: 'pt', ITA: 'it',
+  NED: 'nl', BEL: 'be', CRO: 'hr', DEN: 'dk', SUI: 'ch',
+  URU: 'uy', COL: 'co', ECU: 'ec', CHI: 'cl', PER: 'pe',
+  VEN: 've', PAR: 'py', BOL: 'bo', PAN: 'pa', HON: 'hn',
+  CRC: 'cr', JAM: 'jm', TRI: 'tt', CUB: 'cu', HAI: 'ht',
+  SEN: 'sn', MAR: 'ma', CMR: 'cm', GHA: 'gh', NGA: 'ng',
+  CIV: 'ci', EGY: 'eg', MLI: 'ml', COD: 'cd', TUN: 'tn',
+  ALG: 'dz', ZAM: 'zm', ANG: 'ao', KEN: 'ke', ZIM: 'zw',
+  JPN: 'jp', KOR: 'kr', AUS: 'au', IRN: 'ir', SAU: 'sa',
+  QAT: 'qa', UAE: 'ae', JOR: 'jo', IRQ: 'iq', UZB: 'uz',
+  CHN: 'cn', IND: 'in', THA: 'th', IDN: 'id', PHI: 'ph',
+  ENG: 'gb-eng', SCO: 'gb-sct', WAL: 'gb-wls', NIR: 'gb-nir',
+  GBR: 'gb', SRB: 'rs', SVK: 'sk', SVN: 'si', POL: 'pl',
+  CZE: 'cz', HUN: 'hu', ROU: 'ro', BUL: 'bg', GRE: 'gr',
+  TUR: 'tr', UKR: 'ua', NOR: 'no', SWE: 'se', FIN: 'fi',
+  ISL: 'is', AUT: 'at', IRL: 'ie', BIH: 'ba', MNE: 'me',
+  MKD: 'mk', ALB: 'al', KOS: 'xk', LUX: 'lu', CYP: 'cy',
+  NZL: 'nz', FIJ: 'fj', PNG: 'pg', VAN: 'vu', SOL: 'sb',
+}
 
-import { getCountry, FALLBACK_COUNTRY } from '@/lib/countries'
+function getISO2(code: string): string {
+  const upper = code.toUpperCase()
+  if (upper.length === 2) return upper.toLowerCase()
+  return ISO3_TO_ISO2[upper] ?? upper.slice(0, 2).toLowerCase()
+}
 
 type Size = 'sm' | 'md' | 'lg'
 
-const SIZE_CLASSES: Record<Size, string> = {
-  sm: 'w-8 h-8 text-[10px]',
-  md: 'w-10 h-10 text-xs',
-  lg: 'w-14 h-14 text-sm',
+const SIZES: Record<Size, { cls: string; imgW: number }> = {
+  sm: { cls: 'w-8 h-8', imgW: 40 },
+  md: { cls: 'w-10 h-10', imgW: 40 },
+  lg: { cls: 'w-14 h-14', imgW: 80 },
 }
 
 export function CountryFlag({
   code,
   size = 'md',
-  showCode = true,
+  showCode,
   className = '',
 }: {
   code: string
@@ -34,43 +47,22 @@ export function CountryFlag({
   showCode?: boolean
   className?: string
 }) {
-  const country = getCountry(code) ?? FALLBACK_COUNTRY
-  const sizeClass = SIZE_CLASSES[size]
-
-  // Build gradient based on flag direction
-  const gradientDirection = country.direction === 'vertical' ? 'to right' : 'to bottom'
-  const stops = country.colors.map((color, i) => {
-    const start = (i / country.colors.length) * 100
-    const end = ((i + 1) / country.colors.length) * 100
-    return `${color} ${start}%, ${color} ${end}%`
-  }).join(', ')
-  const background = `linear-gradient(${gradientDirection}, ${stops})`
+  const iso2 = getISO2(code)
+  const { cls, imgW } = SIZES[size]
 
   return (
     <span
-      className={`${sizeClass} rounded-sm flex items-center justify-center font-bold tracking-tight flex-shrink-0 relative overflow-hidden border ${className}`}
-      style={{
-        background,
-        borderColor: 'rgba(0,0,0,0.08)',
-      }}
-      title={country.name}
-      aria-label={country.name}
+      className={`${cls} rounded-full overflow-hidden flex-shrink-0 inline-flex items-center justify-center border ${className}`}
+      style={{ borderColor: 'rgba(0,0,0,0.1)' }}
+      title={code}
+      aria-label={code}
     >
-      {showCode && (
-        <span
-          className="relative z-10 px-1 rounded-sm"
-          style={{
-            color: country.textColor === 'white' ? '#FFFFFF' : '#000000',
-            backgroundColor: country.textColor === 'white'
-              ? 'rgba(0,0,0,0.35)'
-              : 'rgba(255,255,255,0.7)',
-            backdropFilter: 'blur(2px)',
-            WebkitBackdropFilter: 'blur(2px)',
-          }}
-        >
-          {code.toUpperCase()}
-        </span>
-      )}
+      <img
+        src={`https://flagcdn.com/w${imgW}/${iso2}.png`}
+        alt={code}
+        className="w-full h-full object-cover"
+        loading="lazy"
+      />
     </span>
   )
 }
