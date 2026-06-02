@@ -24,6 +24,8 @@ const ISO3_TO_ISO2: Record<string, string> = {
 
 function getISO2(code: string): string {
   const upper = code.toUpperCase()
+  if (upper === 'EN') return 'gb-eng'
+  if (upper === 'SC') return 'gb-sct'
   if (upper.length === 2) return upper.toLowerCase()
   return ISO3_TO_ISO2[upper] ?? upper.slice(0, 2).toLowerCase()
 }
