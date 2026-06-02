@@ -27,8 +27,8 @@ export async function GET(request: Request) {
         estado,
         goles_local,
         goles_visitante,
-        equipo_local:equipos!equipo_local_id (id, nombre_pais, codigo_iso),
-        equipo_visitante:equipos!equipo_visitante_id (id, nombre_pais, codigo_iso)
+        equipo_local:equipos!equipo_local_id (id, nombre_pais, codigo_iso, bandera_url),
+        equipo_visitante:equipos!equipo_visitante_id (id, nombre_pais, codigo_iso, bandera_url)
       `)
       .order('fecha_hora', { ascending: true })
 

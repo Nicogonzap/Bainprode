@@ -23,7 +23,7 @@ const BAIN = {
 
 const TZ = 'America/Argentina/Buenos_Aires'
 
-type Equipo = { id: string; nombre_pais: string; codigo_iso: string }
+type Equipo = { id: string; nombre_pais: string; codigo_iso: string; bandera_url: string | null }
 type Partido = {
   id: string; fecha_hora: string; estadio: string; ciudad: string
   fase: string; grupo_fase: string; estado: string
@@ -59,7 +59,7 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
           {formatHour(match.fecha_hora)}
         </span>
         <div className="flex items-center gap-1.5">
-          <CountryFlag code={match.equipo_local.codigo_iso} size="sm" />
+          <CountryFlag code={match.equipo_local.codigo_iso} url={match.equipo_local.bandera_url ?? undefined} size="sm" />
           <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
             {match.equipo_local.codigo_iso}
           </span>
@@ -72,7 +72,7 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
           <span className="text-xs" style={{ color: BAIN.graySecondary }}>vs</span>
         )}
         <div className="flex items-center gap-1.5">
-          <CountryFlag code={match.equipo_visitante.codigo_iso} size="sm" />
+          <CountryFlag code={match.equipo_visitante.codigo_iso} url={match.equipo_visitante.bandera_url ?? undefined} size="sm" />
           <span className="text-xs font-medium hidden sm:inline" style={{ color: BAIN.black }}>
             {match.equipo_visitante.codigo_iso}
           </span>
@@ -320,12 +320,12 @@ function HomePageContent() {
                   </p>
                   <div className="flex items-center justify-around mb-6">
                     <div className="flex flex-col items-center gap-2">
-                      <CountryFlag code={nextMatch.equipo_local.codigo_iso} size="lg" />
+                      <CountryFlag code={nextMatch.equipo_local.codigo_iso} url={nextMatch.equipo_local.bandera_url ?? undefined} size="lg" />
                       <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_local.nombre_pais}</span>
                     </div>
                     <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
                     <div className="flex flex-col items-center gap-2">
-                      <CountryFlag code={nextMatch.equipo_visitante.codigo_iso} size="lg" />
+                      <CountryFlag code={nextMatch.equipo_visitante.codigo_iso} url={nextMatch.equipo_visitante.bandera_url ?? undefined} size="lg" />
                       <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_visitante.nombre_pais}</span>
                     </div>
                   </div>
@@ -360,13 +360,13 @@ function HomePageContent() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <CountryFlag code={m.equipo_local.codigo_iso} size="sm" />
+                          <CountryFlag code={m.equipo_local.codigo_iso} url={m.equipo_local.bandera_url ?? undefined} size="sm" />
                           <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_local.nombre_pais}</span>
                         </div>
                         <span className="text-xs flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
                         <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
                           <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_visitante.nombre_pais}</span>
-                          <CountryFlag code={m.equipo_visitante.codigo_iso} size="sm" />
+                          <CountryFlag code={m.equipo_visitante.codigo_iso} url={m.equipo_visitante.bandera_url ?? undefined} size="sm" />
                         </div>
                       </div>
                     </li>

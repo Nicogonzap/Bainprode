@@ -40,17 +40,19 @@ const SIZES: Record<Size, { cls: string; imgW: number }> = {
 
 export function CountryFlag({
   code,
+  url,
   size = 'md',
   showCode,
   className = '',
 }: {
   code: string
+  url?: string
   size?: Size
   showCode?: boolean
   className?: string
 }) {
-  const iso2 = getISO2(code)
   const { cls, imgW } = SIZES[size]
+  const src = url ?? `https://flagcdn.com/w${imgW}/${getISO2(code)}.png`
 
   return (
     <span
@@ -60,7 +62,7 @@ export function CountryFlag({
       aria-label={code}
     >
       <img
-        src={`https://flagcdn.com/w${imgW}/${iso2}.png`}
+        src={src}
         alt={code}
         className="w-full h-full object-cover"
         loading="lazy"
