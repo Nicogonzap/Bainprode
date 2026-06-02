@@ -14,7 +14,6 @@ export const metadata: Metadata = {
   title: 'Prode Bain — Mundial 2026',
   description:
     'Pronósticos del Mundial FIFA 2026 para la oficina de Bain Argentina. Predecí los 104 partidos y competí con tus colegas.',
-  generator: 'v0.app',
   applicationName: 'Prode Bain Mundial 2026',
   keywords: ['prode', 'mundial', '2026', 'bain', 'argentina', 'pronósticos', 'fifa'],
   authors: [{ name: 'Bain & Company Argentina' }],
@@ -27,14 +26,6 @@ export const metadata: Metadata = {
   robots: {
     index: false,
     follow: false,
-  },
-  icons: {
-    icon: [
-      { url: '/icon-light-32x32.png', media: '(prefers-color-scheme: light)' },
-      { url: '/icon-dark-32x32.png', media: '(prefers-color-scheme: dark)' },
-      { url: '/icon.svg', type: 'image/svg+xml' },
-    ],
-    apple: '/apple-icon.png',
   },
 }
 
