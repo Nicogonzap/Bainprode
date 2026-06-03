@@ -63,11 +63,7 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (descripcion !== undefined) updates.descripcion = descripcion?.trim() || null
 
     const { data, error } = await supabase
-      .from('torneos')
-      .update(updates)
-      .eq('id', id)
-      .select()
-      .single()
+      .from('torneos').update(updates).eq('id', id).select().single()
     if (error) throw error
     return NextResponse.json({ torneo: data })
   } catch (err: any) {
@@ -78,16 +74,21 @@ export async function PATCH(request: Request, { params }: { params: { id: string
 export async function DELETE(request: Request, { params }: { params: { id: string } }) {
   const { id } = params
   try {
-    const { usuario_id } = await request.json()
+    // usuario_id viene por query param para evitar problemas con body en DELETE
+    const { searchParams } = new URL(request.url)
+    const usuario_id = searchParams.get('usuario_id')
     if (!usuario_id) return NextResponse.json({ error: 'usuario_id required' }, { status: 400 })
 
     const supabase = getServerClient()
-    const { data: torneo } = await supabase.from('torneos').select('creado_por').eq('id', id).single()
-    if (!torneo || torneo.creado_por !== usuario_id) {
+    const { data: torneo, error: fetchError } = await supabase
+      .from('torneos').select('creado_por').eq('id', id).single()
+
+    if (fetchError) throw fetchError
+    if (!torneo) return NextResponse.json({ error: 'Torneo no encontrado' }, { status: 404 })
+    if (torneo.creado_por !== usuario_id) {
       return NextResponse.json({ error: 'Solo el creador puede eliminar el torneo' }, { status: 403 })
     }
 
-    // CASCADE elimina torneo_miembros automaticamente
     const { error } = await supabase.from('torneos').delete().eq('id', id)
     if (error) throw error
     return NextResponse.json({ ok: true })

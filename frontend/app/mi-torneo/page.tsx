@@ -422,15 +422,21 @@ function MisTorneosContent() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ torneo_id: torneoId, usuario_id: user.id }),
       })
-      if (!res.ok) { toast({ message: 'Error al salir del torneo', type: 'error' }); return }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast({ message: json.error || 'Error al salir del torneo', type: 'error' })
+        return
+      }
       toast({ message: 'Saliste del torneo', type: 'success', duration: 2000 })
     } else {
-      const res = await fetch(`/api/torneos/${torneoId}`, {
+      const res = await fetch(`/api/torneos/${torneoId}?usuario_id=${user.id}`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ usuario_id: user.id }),
       })
-      if (!res.ok) { toast({ message: 'Error al eliminar el torneo', type: 'error' }); return }
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast({ message: json.error || 'Error al eliminar el torneo', type: 'error' })
+        return
+      }
       toast({ message: 'Torneo eliminado', type: 'success', duration: 2000 })
     }
 
