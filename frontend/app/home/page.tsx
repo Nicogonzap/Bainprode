@@ -284,7 +284,7 @@ function HomePageContent() {
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
             Hola, {nombreDisplay}
           </h1>
-          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Mundial 2026 · Prode Bain Buenos Aires</p>
+          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Mundial 2026 · Prode Bain</p>
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
@@ -417,7 +417,7 @@ function HomePageContent() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
               <DateGroup label="Partidos ayer" matches={recentMatches} showScore />
               <DateGroup label="Partidos hoy" matches={todayMatches} showScore />
-              <DateGroup label="Partido mañana" matches={proximosMatches} />
+              <DateGroup label="Partidos mañana" matches={proximosMatches} />
             </div>
           )}
         </section>

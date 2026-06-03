@@ -1,12 +1,13 @@
 ﻿'use client'
 
 import { useState, useMemo, useEffect } from 'react'
-import { Lock, Trophy, Target, Sparkles, Clock, Check } from 'lucide-react'
+import { Lock, Trophy, Target, Sparkles, Clock, Check, Star } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
 import { ToastProvider, useToast } from '@/components/toast'
 import { GROUPS, type GroupKey } from '@/lib/groups'
+import { getPlayersByCountry } from '@/lib/players'
 import { useAuth } from '@/lib/auth-context'
 
 const BAIN = {
@@ -29,14 +30,14 @@ type Specials = {
   champion: string
   topScorer: { player: string; team: string }
   topAssister: { player: string; team: string }
-  darkHorse: string
+  bestPlayer: { player: string; team: string }
 }
 
 const INITIAL: Specials = {
   champion: '',
   topScorer: { player: '', team: '' },
   topAssister: { player: '', team: '' },
-  darkHorse: '',
+  bestPlayer: { player: '', team: '' },
 }
 
 const ALL_TEAMS = (Object.keys(GROUPS) as GroupKey[])
@@ -62,7 +63,8 @@ function EspecialesContent() {
             champion: data.campeon ?? '',
             topScorer: { player: data.goleador_nombre ?? '', team: data.goleador_equipo ?? '' },
             topAssister: { player: data.asistente_nombre ?? '', team: data.asistente_equipo ?? '' },
-            darkHorse: data.sorpresa ?? '',
+            // "Mejor jugador" aún no tiene campo en el backend, así que arranca vacío.
+            bestPlayer: { player: '', team: '' },
           })
         }
       })
@@ -86,7 +88,7 @@ function EspecialesContent() {
     if (specials.champion) n += 1
     if (specials.topScorer.player && specials.topScorer.team) n += 1
     if (specials.topAssister.player && specials.topAssister.team) n += 1
-    if (specials.darkHorse) n += 1
+    if (specials.bestPlayer.player && specials.bestPlayer.team) n += 1
     return n
   }, [specials])
 
@@ -104,7 +106,9 @@ function EspecialesContent() {
           goleador_equipo: specials.topScorer.team || null,
           asistente_nombre: specials.topAssister.player || null,
           asistente_equipo: specials.topAssister.team || null,
-          sorpresa: specials.darkHorse || null,
+          // NOTA: "Mejor jugador" todavía no se envía al backend porque no existe
+          // el campo. Cuando Nico lo agregue, sumar acá: mejor_jugador_nombre / _equipo.
+          sorpresa: null,
         }),
       })
       if (!res.ok) throw new Error('Error al guardar')
@@ -162,14 +166,36 @@ function EspecialesContent() {
             <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={50} isLocked={isLocked} isFilled={!!specials.champion}>
               <TeamSelect value={specials.champion} onChange={(code) => setSpecials((s) => ({ ...s, champion: code }))} disabled={isLocked} />
             </PredictionCard>
+
             <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles convertidos" points={30} isLocked={isLocked} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
-              <PlayerTeamInput player={specials.topScorer.player} team={specials.topScorer.team} onPlayerChange={(player) => setSpecials((s) => ({ ...s, topScorer: { ...s.topScorer, player } }))} onTeamChange={(team) => setSpecials((s) => ({ ...s, topScorer: { ...s.topScorer, team } }))} disabled={isLocked} playerPlaceholder="Ej: Lionel Messi" />
+              <CountryPlayerSelect
+                team={specials.topScorer.team}
+                player={specials.topScorer.player}
+                onTeamChange={(team) => setSpecials((s) => ({ ...s, topScorer: { team, player: '' } }))}
+                onPlayerChange={(player) => setSpecials((s) => ({ ...s, topScorer: { ...s.topScorer, player } }))}
+                disabled={isLocked}
+              />
             </PredictionCard>
+
             <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Máximo asistente" subtitle="Jugador con más asistencias" points={20} isLocked={isLocked} isFilled={!!specials.topAssister.player && !!specials.topAssister.team}>
-              <PlayerTeamInput player={specials.topAssister.player} team={specials.topAssister.team} onPlayerChange={(player) => setSpecials((s) => ({ ...s, topAssister: { ...s.topAssister, player } }))} onTeamChange={(team) => setSpecials((s) => ({ ...s, topAssister: { ...s.topAssister, team } }))} disabled={isLocked} playerPlaceholder="Ej: Kevin De Bruyne" />
+              <CountryPlayerSelect
+                team={specials.topAssister.team}
+                player={specials.topAssister.player}
+                onTeamChange={(team) => setSpecials((s) => ({ ...s, topAssister: { team, player: '' } }))}
+                onPlayerChange={(player) => setSpecials((s) => ({ ...s, topAssister: { ...s.topAssister, player } }))}
+                disabled={isLocked}
+              />
             </PredictionCard>
-            <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Sorpresa del torneo" subtitle="País que llega más lejos de lo esperado" points={15} isLocked={isLocked} isFilled={!!specials.darkHorse} accent="amber">
-              <TeamSelect value={specials.darkHorse} onChange={(code) => setSpecials((s) => ({ ...s, darkHorse: code }))} disabled={isLocked} />
+
+            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Mejor jugador" subtitle="La figura del torneo (Balón de Oro)" points={20} isLocked={isLocked} isFilled={!!specials.bestPlayer.player && !!specials.bestPlayer.team} accent="amber">
+              <CountryPlayerSelect
+                team={specials.bestPlayer.team}
+                player={specials.bestPlayer.player}
+                onTeamChange={(team) => setSpecials((s) => ({ ...s, bestPlayer: { team, player: '' } }))}
+                onPlayerChange={(player) => setSpecials((s) => ({ ...s, bestPlayer: { ...s.bestPlayer, player } }))}
+                disabled={isLocked}
+              />
+              <p className="text-xs mt-2" style={{ color: BAIN.amber }}>Por ahora esta predicción no se guarda (en preparación).</p>
             </PredictionCard>
           </div>
         )}
@@ -189,7 +215,7 @@ function EspecialesContent() {
             <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Trophy size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Campeón del Mundial</span><span className="font-bold">50 pts</span></li>
             <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Target size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Goleador del torneo</span><span className="font-bold">30 pts</span></li>
             <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Sparkles size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Máximo asistente</span><span className="font-bold">20 pts</span></li>
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Sparkles size={14} strokeWidth={2} style={{ color: BAIN.amber }} /><span className="flex-1">Sorpresa del torneo (semis o más)</span><span className="font-bold">15 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Star size={14} strokeWidth={2} style={{ color: BAIN.amber }} /><span className="flex-1">Mejor jugador del torneo</span><span className="font-bold">20 pts</span></li>
           </ul>
         </section>
       </main>
@@ -235,16 +261,49 @@ function TeamSelect({ value, onChange, disabled }: { value: string; onChange: (c
   )
 }
 
-function PlayerTeamInput({ player, team, onPlayerChange, onTeamChange, disabled, playerPlaceholder }: {
-  player: string; team: string; onPlayerChange: (v: string) => void; onTeamChange: (v: string) => void; disabled: boolean; playerPlaceholder: string
+// Primero se elige el país; eso habilita y filtra la lista de jugadores de ese país.
+function CountryPlayerSelect({ team, player, onTeamChange, onPlayerChange, disabled }: {
+  team: string; player: string
+  onTeamChange: (code: string) => void
+  onPlayerChange: (name: string) => void
+  disabled: boolean
 }) {
+  const players = useMemo(() => getPlayersByCountry(team), [team])
+  const noPlayers = team !== '' && players.length === 0
+
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      <input type="text" placeholder={playerPlaceholder} value={player} onChange={(e) => onPlayerChange(e.target.value)} disabled={disabled} className="px-3 py-2 rounded-md text-sm focus:outline-none transition-colors" style={{ border: `1px solid ${player ? BAIN.black : BAIN.grayBorder}`, backgroundColor: disabled ? BAIN.grayBg : BAIN.white, color: BAIN.black }} />
-      <select value={team} onChange={(e) => onTeamChange(e.target.value)} disabled={disabled} className="px-3 py-2 rounded-md text-sm focus:outline-none transition-colors" style={{ border: `1px solid ${team ? BAIN.black : BAIN.grayBorder}`, backgroundColor: disabled ? BAIN.grayBg : BAIN.white, color: team ? BAIN.black : BAIN.graySecondary, cursor: disabled ? 'not-allowed' : 'pointer' }}>
-        <option value="">— Selección —</option>
-        {ALL_TEAMS.map((t) => <option key={`${t.code}-${t.group}`} value={t.code}>{t.name}</option>)}
-      </select>
+    <div className="flex flex-col gap-2">
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {/* Paso 1: país */}
+        <div className="flex items-center gap-2">
+          {team && <div className="flex-shrink-0"><CountryFlag code={team} size="sm" /></div>}
+          <select
+            value={team}
+            onChange={(e) => onTeamChange(e.target.value)}
+            disabled={disabled}
+            className="flex-1 px-3 py-2 rounded-md text-sm focus:outline-none transition-colors"
+            style={{ border: `1px solid ${team ? BAIN.black : BAIN.grayBorder}`, backgroundColor: disabled ? BAIN.grayBg : BAIN.white, color: team ? BAIN.black : BAIN.graySecondary, cursor: disabled ? 'not-allowed' : 'pointer' }}
+          >
+            <option value="">— 1. Elegí un país —</option>
+            {ALL_TEAMS.map((t) => <option key={`${t.code}-${t.group}`} value={t.code}>{t.name}</option>)}
+          </select>
+        </div>
+
+        {/* Paso 2: jugador (se habilita al elegir país) */}
+        <select
+          value={player}
+          onChange={(e) => onPlayerChange(e.target.value)}
+          disabled={disabled || !team || noPlayers}
+          className="px-3 py-2 rounded-md text-sm focus:outline-none transition-colors"
+          style={{ border: `1px solid ${player ? BAIN.black : BAIN.grayBorder}`, backgroundColor: (disabled || !team || noPlayers) ? BAIN.grayBg : BAIN.white, color: player ? BAIN.black : BAIN.graySecondary, cursor: (disabled || !team || noPlayers) ? 'not-allowed' : 'pointer' }}
+        >
+          <option value="">{!team ? '— 2. Primero elegí país —' : '— Elegí un jugador —'}</option>
+          {players.map((p) => <option key={p} value={p}>{p}</option>)}
+        </select>
+      </div>
+      {noPlayers && (
+        <p className="text-xs" style={{ color: BAIN.graySecondary }}>Todavía no hay jugadores cargados para esta selección.</p>
+      )}
     </div>
   )
 }
