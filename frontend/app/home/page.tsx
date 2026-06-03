@@ -415,9 +415,9 @@ function HomePageContent() {
             <p className="text-sm py-6 text-center" style={{ color: BAIN.graySecondary }}>Cargando partidos...</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <DateGroup label="Partidos recientes" matches={recentMatches} showScore />
-              <DateGroup label="Partidos de hoy" matches={todayMatches} showScore />
-              <DateGroup label="Próximos partidos" matches={proximosMatches} />
+              <DateGroup label="Partidos ayer" matches={recentMatches} showScore />
+              <DateGroup label="Partidos hoy" matches={todayMatches} showScore />
+              <DateGroup label="Partido mañana" matches={proximosMatches} />
             </div>
           )}
         </section>

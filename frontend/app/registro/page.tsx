@@ -178,6 +178,13 @@ export default function RegistroPage() {
           <p className="text-sm" style={{ color: BAIN.graySecondary }}>
             Registrate con tu email corporativo para participar del prode.
           </p>
+          <div
+            className="mt-4 rounded-md p-3 text-sm flex items-start gap-2"
+            style={{ backgroundColor: '#FFF0F0', color: BAIN.red, border: `1px solid ${BAIN.red}40` }}
+          >
+            <span aria-hidden="true">⚠️</span>
+            <span>Solo se permiten cuentas con email <strong>@bain.com</strong>.</span>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="px-8 pb-8 pt-4 space-y-4" noValidate>
