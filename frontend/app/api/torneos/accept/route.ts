@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 }
 
-// Cancelar/rechazar invitacion
+// Salir de un torneo (activo) o rechazar invitacion (pendiente)
 export async function DELETE(request: Request) {
   try {
     const { torneo_id, usuario_id } = await request.json()
@@ -37,12 +37,22 @@ export async function DELETE(request: Request) {
       return NextResponse.json({ error: 'torneo_id and usuario_id required' }, { status: 400 })
     }
     const supabase = getServerClient()
+
+    // El creador no puede salir, debe eliminar el torneo
+    const { data: torneo } = await supabase
+      .from('torneos')
+      .select('creado_por')
+      .eq('id', torneo_id)
+      .single()
+    if (torneo?.creado_por === usuario_id) {
+      return NextResponse.json({ error: 'El creador no puede salir del torneo. Usá "Eliminar torneo".' }, { status: 400 })
+    }
+
     const { error } = await supabase
       .from('torneo_miembros')
       .delete()
       .eq('torneo_id', torneo_id)
       .eq('usuario_id', usuario_id)
-      .eq('estado', 'pendiente')
     if (error) throw error
     return NextResponse.json({ ok: true })
   } catch (err: any) {

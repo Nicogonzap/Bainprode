@@ -53,7 +53,6 @@ export async function PATCH(request: Request, { params }: { params: { id: string
     if (!usuario_id) return NextResponse.json({ error: 'usuario_id required' }, { status: 400 })
 
     const supabase = getServerClient()
-    // Verificar que sea el creador
     const { data: torneo } = await supabase.from('torneos').select('creado_por').eq('id', id).single()
     if (!torneo || torneo.creado_por !== usuario_id) {
       return NextResponse.json({ error: 'Solo el creador puede editar el torneo' }, { status: 403 })
@@ -71,6 +70,27 @@ export async function PATCH(request: Request, { params }: { params: { id: string
       .single()
     if (error) throw error
     return NextResponse.json({ torneo: data })
+  } catch (err: any) {
+    return NextResponse.json({ error: err.message }, { status: 500 })
+  }
+}
+
+export async function DELETE(request: Request, { params }: { params: { id: string } }) {
+  const { id } = params
+  try {
+    const { usuario_id } = await request.json()
+    if (!usuario_id) return NextResponse.json({ error: 'usuario_id required' }, { status: 400 })
+
+    const supabase = getServerClient()
+    const { data: torneo } = await supabase.from('torneos').select('creado_por').eq('id', id).single()
+    if (!torneo || torneo.creado_por !== usuario_id) {
+      return NextResponse.json({ error: 'Solo el creador puede eliminar el torneo' }, { status: 403 })
+    }
+
+    // CASCADE elimina torneo_miembros automaticamente
+    const { error } = await supabase.from('torneos').delete().eq('id', id)
+    if (error) throw error
+    return NextResponse.json({ ok: true })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
