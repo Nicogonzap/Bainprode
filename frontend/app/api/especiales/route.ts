@@ -39,7 +39,10 @@ export async function POST(request: Request) {
       goleador_equipo,
       asistente_nombre,
       asistente_equipo,
-      sorpresa,
+      balon_de_oro_nombre,
+      balon_de_oro_equipo,
+      guante_de_oro_nombre,
+      guante_de_oro_equipo,
     } = body
 
     if (!usuario_id) return NextResponse.json({ error: 'usuario_id requerido' }, { status: 400 })
@@ -55,7 +58,10 @@ export async function POST(request: Request) {
           goleador_equipo,
           asistente_nombre,
           asistente_equipo,
-          sorpresa,
+          balon_de_oro_nombre,
+          balon_de_oro_equipo,
+          guante_de_oro_nombre,
+          guante_de_oro_equipo,
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'usuario_id' }

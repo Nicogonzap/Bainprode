@@ -50,7 +50,7 @@ function grupoLabel(grupo_fase: string | null) {
 
 function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean }) {
   const hasScore = match.goles_local !== null && match.goles_visitante !== null
-  const lugar = match.ciudad || match.estadio || ''
+  const lugar = [match.estadio, match.ciudad].filter(Boolean).join(' · ')
   return (
     <div className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
       style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
@@ -284,7 +284,7 @@ function HomePageContent() {
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
             Hola, {nombreDisplay}
           </h1>
-          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Mundial 2026 · Prode Bain Buenos Aires</p>
+          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Prode Bain</p>
         </section>
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
