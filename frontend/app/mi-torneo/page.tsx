@@ -31,14 +31,24 @@ interface TorneoCard {
   creado_por?: string
 }
 
-// ─── Modal de confirmacion generico ─────────────────────────────────────────
-
-function ConfirmModal({ title, message, confirmLabel, onConfirm, onClose }: {
+// La accion se guarda directamente en el estado para evitar problemas de closure
+type ConfirmState = {
+  open: boolean
   title: string
   message: string
   confirmLabel: string
-  onConfirm: () => Promise<void>
-  onClose: () => void
+  action: () => Promise<void>
+}
+
+const CONFIRM_CLOSED: ConfirmState = {
+  open: false, title: '', message: '', confirmLabel: '', action: async () => {},
+}
+
+// ─── Modal de confirmacion ───────────────────────────────────────────────────
+
+function ConfirmModal({ title, message, confirmLabel, onConfirm, onClose }: {
+  title: string; message: string; confirmLabel: string
+  onConfirm: () => Promise<void>; onClose: () => void
 }) {
   const [loading, setLoading] = useState(false)
 
@@ -66,7 +76,7 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onClose }: {
             Cancelar
           </button>
           <button type="button" onClick={handleConfirm} disabled={loading}
-            className="flex-1 py-2.5 rounded-md text-sm font-bold transition-opacity"
+            className="flex-1 py-2.5 rounded-md text-sm font-bold"
             style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: loading ? 0.7 : 1 }}>
             {loading ? 'Procesando...' : confirmLabel}
           </button>
@@ -76,12 +86,10 @@ function ConfirmModal({ title, message, confirmLabel, onConfirm, onClose }: {
   )
 }
 
-// ─── Card de torneo pendiente ────────────────────────────────────────────────
+// ─── Card pendiente ──────────────────────────────────────────────────────────
 
 function PendingTorneoCard({ card, onAccept, onReject }: {
-  card: TorneoCard
-  onAccept: () => Promise<void>
-  onReject: () => Promise<void>
+  card: TorneoCard; onAccept: () => Promise<void>; onReject: () => Promise<void>
 }) {
   const [accepting, setAccepting] = useState(false)
   const [rejecting, setRejecting] = useState(false)
@@ -98,25 +106,19 @@ function PendingTorneoCard({ card, onAccept, onReject }: {
             </span>
           </div>
           <h2 className="text-lg font-bold tracking-tight" style={{ color: BAIN.black }}>{card.nombre}</h2>
-          {card.descripcion && (
-            <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>{card.descripcion}</p>
-          )}
+          {card.descripcion && <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>{card.descripcion}</p>}
         </div>
       </div>
-      <p className="text-sm mb-4" style={{ color: BAIN.graySecondary }}>
-        Fuiste invitado/a a este torneo. ¿Querés unirte?
-      </p>
+      <p className="text-sm mb-4" style={{ color: BAIN.graySecondary }}>Fuiste invitado/a a este torneo. ¿Querés unirte?</p>
       <div className="flex gap-3">
-        <button type="button"
+        <button type="button" disabled={accepting || rejecting}
           onClick={async () => { setAccepting(true); try { await onAccept() } finally { setAccepting(false) } }}
-          disabled={accepting || rejecting}
           className="flex-1 py-2 rounded-md text-sm font-bold"
           style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: accepting ? 0.7 : 1 }}>
           {accepting ? 'Aceptando...' : 'Aceptar'}
         </button>
-        <button type="button"
+        <button type="button" disabled={accepting || rejecting}
           onClick={async () => { setRejecting(true); try { await onReject() } finally { setRejecting(false) } }}
-          disabled={accepting || rejecting}
           className="flex-1 py-2 rounded-md text-sm font-bold"
           style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black, opacity: rejecting ? 0.7 : 1 }}>
           {rejecting ? 'Cancelando...' : 'Rechazar'}
@@ -126,37 +128,27 @@ function PendingTorneoCard({ card, onAccept, onReject }: {
   )
 }
 
-// ─── Card de torneo activo ───────────────────────────────────────────────────
+// ─── Card activa ─────────────────────────────────────────────────────────────
 
 function StatBox({ label, value }: { label: string; value: string | number }) {
   return (
     <div>
-      <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
-        {label}
-      </p>
+      <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{label}</p>
       <p className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>{value}</p>
     </div>
   )
 }
 
 function TorneoCardView({ card, userId, onLeave, onDelete }: {
-  card: TorneoCard
-  userId: string
+  card: TorneoCard; userId: string
   onLeave: (id: string, nombre: string) => void
   onDelete: (id: string, nombre: string) => void
 }) {
   const [copied, setCopied] = useState(false)
   const host = typeof window !== 'undefined' ? window.location.origin : ''
   const inviteUrl = card.invite_code ? `${host}/torneo/join/${card.invite_code}` : null
-  const isCreator = card.creado_por === userId
   const isGeneral = card.id === null
-
-  const handleCopy = async () => {
-    if (!inviteUrl) return
-    await navigator.clipboard.writeText(inviteUrl).catch(() => {})
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
-  }
+  const isCreator = !isGeneral && card.creado_por === userId
 
   return (
     <div className="rounded-md p-6" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
@@ -166,40 +158,32 @@ function TorneoCardView({ card, userId, onLeave, onDelete }: {
             {isGeneral ? 'RANKING GENERAL' : 'TORNEO'}
           </p>
           <h2 className="text-lg font-bold tracking-tight" style={{ color: BAIN.black }}>{card.nombre}</h2>
-          {card.descripcion && (
-            <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>{card.descripcion}</p>
-          )}
+          {card.descripcion && <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>{card.descripcion}</p>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {card.id !== null && (
-            <Link href={`/torneo/${card.id}`} className="text-xs font-medium underline"
-              style={{ color: BAIN.red }}>
+          {!isGeneral && (
+            <Link href={`/torneo/${card.id}`} className="text-xs font-medium underline" style={{ color: BAIN.red }}>
               Ver ranking
             </Link>
           )}
           {!isGeneral && isCreator && (
-            <button type="button"
-              onClick={() => onDelete(card.id!, card.nombre)}
+            <button type="button" onClick={() => onDelete(card.id!, card.nombre)}
               className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md"
-              style={{ color: BAIN.red, backgroundColor: '#FFF0F0', border: `1px solid ${BAIN.red}30` }}
-              title="Eliminar torneo">
+              style={{ color: BAIN.red, backgroundColor: '#FFF0F0', border: `1px solid ${BAIN.red}30` }}>
               <Trash2 size={12} /> Eliminar
             </button>
           )}
           {!isGeneral && !isCreator && (
-            <button type="button"
-              onClick={() => onLeave(card.id!, card.nombre)}
+            <button type="button" onClick={() => onLeave(card.id!, card.nombre)}
               className="flex items-center gap-1 text-xs font-medium px-2.5 py-1.5 rounded-md"
-              style={{ color: BAIN.graySecondary, backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }}
-              title="Salir del torneo">
+              style={{ color: BAIN.graySecondary, backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }}>
               <LogOut size={12} /> Salir
             </button>
           )}
         </div>
       </div>
 
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-5"
-        style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-6 pt-5" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
         <StatBox label="PARTICIPANTES" value={card.participantes} />
         <StatBox label="TU POSICIÓN" value={card.posicion !== null ? `${card.posicion}°` : '—'} />
         <StatBox label="PUNTOS 1°" value={card.puntosPrimero} />
@@ -208,10 +192,9 @@ function TorneoCardView({ card, userId, onLeave, onDelete }: {
 
       {inviteUrl && (
         <div className="mt-5 pt-5 flex items-center gap-3" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
-          <span className="text-xs font-mono truncate flex-1" style={{ color: BAIN.graySecondary }}>
-            {inviteUrl}
-          </span>
-          <button type="button" onClick={handleCopy}
+          <span className="text-xs font-mono truncate flex-1" style={{ color: BAIN.graySecondary }}>{inviteUrl}</span>
+          <button type="button"
+            onClick={async () => { await navigator.clipboard.writeText(inviteUrl).catch(() => {}); setCopied(true); setTimeout(() => setCopied(false), 2000) }}
             className="text-xs font-medium flex-shrink-0 px-3 py-1.5 rounded-md flex items-center gap-1.5"
             style={{ backgroundColor: copied ? BAIN.black : BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}`, color: copied ? BAIN.white : BAIN.black }}>
             {copied ? <><Check size={12} />Copiado</> : <><Copy size={12} />Copiar link</>}
@@ -224,7 +207,7 @@ function TorneoCardView({ card, userId, onLeave, onDelete }: {
 
 // ─── Modal crear torneo ──────────────────────────────────────────────────────
 
-function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreated: (torneo: any) => void }) {
+function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreated: () => void }) {
   const { user } = useAuth()
   const { toast } = useToast()
   const [nombre, setNombre] = useState('')
@@ -245,7 +228,7 @@ function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreat
       const json = await res.json()
       if (!res.ok) throw new Error(json.error || 'Error al crear el torneo')
       toast({ message: '¡Torneo creado! Compartí el link para invitar.', type: 'success' })
-      onCreated(json.torneo)
+      onCreated()
     } catch (e: any) {
       setError(e.message)
     } finally {
@@ -260,23 +243,20 @@ function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreat
         style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-bold" style={{ color: BAIN.black }}>Crear torneo</h2>
-          <button type="button" onClick={onClose} className="p-1 rounded-md hover:opacity-60"
-            style={{ color: BAIN.graySecondary }}>
+          <button type="button" onClick={onClose} className="p-1 rounded-md hover:opacity-60" style={{ color: BAIN.graySecondary }}>
             <X size={20} />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4">
           <div>
-            <label className="block text-xs font-medium uppercase mb-1.5"
-              style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>Nombre *</label>
+            <label className="block text-xs font-medium uppercase mb-1.5" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>Nombre *</label>
             <input type="text" value={nombre} onChange={e => setNombre(e.target.value)}
               placeholder="Ej: Prode Bain Chile" maxLength={80} required
               className="w-full px-3 py-2.5 rounded-md text-sm outline-none"
               style={{ border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black, backgroundColor: BAIN.white }} />
           </div>
           <div>
-            <label className="block text-xs font-medium uppercase mb-1.5"
-              style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>Descripción (opcional)</label>
+            <label className="block text-xs font-medium uppercase mb-1.5" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>Descripción (opcional)</label>
             <textarea value={descripcion} onChange={e => setDescripcion(e.target.value)}
               placeholder="Descripción del torneo..." rows={3} maxLength={300}
               className="w-full px-3 py-2.5 rounded-md text-sm outline-none resize-none"
@@ -286,9 +266,7 @@ function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreat
           <div className="flex gap-3 pt-1">
             <button type="button" onClick={onClose}
               className="flex-1 py-2.5 rounded-md text-sm font-medium"
-              style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>
-              Cancelar
-            </button>
+              style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}>Cancelar</button>
             <button type="submit" disabled={loading || !nombre.trim()}
               className="flex-1 py-2.5 rounded-md text-sm font-bold"
               style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: loading || !nombre.trim() ? 0.6 : 1 }}>
@@ -303,13 +281,6 @@ function CrearTorneoModal({ onClose, onCreated }: { onClose: () => void; onCreat
 
 // ─── Pagina principal ────────────────────────────────────────────────────────
 
-type ConfirmState = {
-  open: boolean
-  type: 'leave' | 'delete'
-  torneoId: string
-  torneoNombre: string
-}
-
 function MisTorneosContent() {
   const { user } = useAuth()
   const { toast } = useToast()
@@ -317,7 +288,7 @@ function MisTorneosContent() {
   const [pendingCards, setPendingCards] = useState<TorneoCard[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreate, setShowCreate] = useState(false)
-  const [confirm, setConfirm] = useState<ConfirmState>({ open: false, type: 'leave', torneoId: '', torneoNombre: '' })
+  const [confirm, setConfirm] = useState<ConfirmState>(CONFIRM_CLOSED)
 
   const load = useCallback(async () => {
     if (!user) return
@@ -387,63 +358,78 @@ function MisTorneosContent() {
 
   useEffect(() => { if (user) load() }, [user, load])
 
+  const reload = useCallback(() => {
+    setLoading(true); setCards([]); setPendingCards([]); load()
+  }, [load])
+
   const handleAcceptPending = async (torneoId: string) => {
-    if (!user) return
     const res = await fetch('/api/torneos/accept', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ torneo_id: torneoId, usuario_id: user.id }),
+      body: JSON.stringify({ torneo_id: torneoId, usuario_id: user?.id }),
     })
     if (!res.ok) { toast({ message: 'Error al aceptar', type: 'error' }); return }
     toast({ message: '¡Te uniste al torneo!', type: 'success' })
-    setLoading(true); setPendingCards([]); setCards([])
-    load()
+    reload()
   }
 
   const handleRejectPending = async (torneoId: string) => {
-    if (!user) return
     const res = await fetch('/api/torneos/accept', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ torneo_id: torneoId, usuario_id: user.id }),
+      body: JSON.stringify({ torneo_id: torneoId, usuario_id: user?.id }),
     })
     if (!res.ok) { toast({ message: 'Error al rechazar', type: 'error' }); return }
     toast({ message: 'Invitación rechazada', type: 'success', duration: 2000 })
     setPendingCards(prev => prev.filter(c => c.id !== torneoId))
   }
 
-  const handleConfirmAction = async () => {
-    if (!user) return
-    const { type, torneoId } = confirm
+  // onLeave y onDelete reciben el id directamente en la closure, sin depender del estado confirm
+  const handleLeave = useCallback((torneoId: string, torneoNombre: string) => {
+    setConfirm({
+      open: true,
+      title: '¿Salir del torneo?',
+      message: `Vas a salir de "${torneoNombre}". Dejará de aparecer en tu lista y no vas a sumar puntos en ese torneo.`,
+      confirmLabel: 'Salir del torneo',
+      action: async () => {
+        const res = await fetch('/api/torneos/accept', {
+          method: 'DELETE',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ torneo_id: torneoId, usuario_id: user?.id }),
+        })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          toast({ message: json.error || 'Error al salir del torneo', type: 'error' })
+          return
+        }
+        toast({ message: 'Saliste del torneo', type: 'success', duration: 2000 })
+        setConfirm(CONFIRM_CLOSED)
+        reload()
+      },
+    })
+  }, [user, toast, reload])
 
-    if (type === 'leave') {
-      const res = await fetch('/api/torneos/accept', {
-        method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ torneo_id: torneoId, usuario_id: user.id }),
-      })
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        toast({ message: json.error || 'Error al salir del torneo', type: 'error' })
-        return
-      }
-      toast({ message: 'Saliste del torneo', type: 'success', duration: 2000 })
-    } else {
-      const res = await fetch(`/api/torneos/${torneoId}?usuario_id=${user.id}`, {
-        method: 'DELETE',
-      })
-      if (!res.ok) {
-        const json = await res.json().catch(() => ({}))
-        toast({ message: json.error || 'Error al eliminar el torneo', type: 'error' })
-        return
-      }
-      toast({ message: 'Torneo eliminado', type: 'success', duration: 2000 })
-    }
-
-    setConfirm(c => ({ ...c, open: false }))
-    setLoading(true); setCards([]); setPendingCards([])
-    load()
-  }
+  const handleDelete = useCallback((torneoId: string, torneoNombre: string) => {
+    setConfirm({
+      open: true,
+      title: '¿Eliminar torneo?',
+      message: `Vas a eliminar "${torneoNombre}" permanentemente. Todos los participantes perderán acceso al torneo.`,
+      confirmLabel: 'Eliminar torneo',
+      action: async () => {
+        const res = await fetch(`/api/torneos/${torneoId}?usuario_id=${user?.id}`, {
+          method: 'DELETE',
+        })
+        if (!res.ok) {
+          const json = await res.json().catch(() => ({}))
+          toast({ message: json.error || 'Error al eliminar el torneo', type: 'error' })
+          return
+        }
+        toast({ message: 'Torneo eliminado', type: 'success', duration: 2000 })
+        setConfirm(CONFIRM_CLOSED)
+        reload()
+      },
+    })
+  }, [user, toast, reload])
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: BAIN.grayBg }}>
@@ -475,11 +461,9 @@ function MisTorneosContent() {
                   INVITACIONES PENDIENTES
                 </p>
                 {pendingCards.map(card => (
-                  <PendingTorneoCard key={card.id}
-                    card={card}
+                  <PendingTorneoCard key={card.id} card={card}
                     onAccept={() => handleAcceptPending(card.id!)}
-                    onReject={() => handleRejectPending(card.id!)}
-                  />
+                    onReject={() => handleRejectPending(card.id!)} />
                 ))}
                 <p className="text-xs font-bold uppercase mt-4" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
                   MIS TORNEOS
@@ -487,13 +471,9 @@ function MisTorneosContent() {
               </>
             )}
             {cards.map(card => (
-              <TorneoCardView
-                key={card.id ?? 'general'}
-                card={card}
-                userId={user?.id ?? ''}
-                onLeave={(id, nombre) => setConfirm({ open: true, type: 'leave', torneoId: id, torneoNombre: nombre })}
-                onDelete={(id, nombre) => setConfirm({ open: true, type: 'delete', torneoId: id, torneoNombre: nombre })}
-              />
+              <TorneoCardView key={card.id ?? 'general'} card={card} userId={user?.id ?? ''}
+                onLeave={handleLeave}
+                onDelete={handleDelete} />
             ))}
           </div>
         )}
@@ -504,21 +484,17 @@ function MisTorneosContent() {
       {showCreate && (
         <CrearTorneoModal
           onClose={() => setShowCreate(false)}
-          onCreated={() => { setShowCreate(false); setLoading(true); setCards([]); setPendingCards([]); load() }}
+          onCreated={() => { setShowCreate(false); reload() }}
         />
       )}
 
       {confirm.open && (
         <ConfirmModal
-          title={confirm.type === 'leave' ? '¿Salir del torneo?' : '¿Eliminar torneo?'}
-          message={
-            confirm.type === 'leave'
-              ? `Vas a salir de "${confirm.torneoNombre}". Dejará de aparecer en tu lista y no vas a sumar puntos en ese torneo.`
-              : `Vas a eliminar "${confirm.torneoNombre}" permanentemente. Todos los participantes perderán acceso al torneo.`
-          }
-          confirmLabel={confirm.type === 'leave' ? 'Salir del torneo' : 'Eliminar torneo'}
-          onConfirm={handleConfirmAction}
-          onClose={() => setConfirm(c => ({ ...c, open: false }))}
+          title={confirm.title}
+          message={confirm.message}
+          confirmLabel={confirm.confirmLabel}
+          onConfirm={confirm.action}
+          onClose={() => setConfirm(CONFIRM_CLOSED)}
         />
       )}
     </div>
