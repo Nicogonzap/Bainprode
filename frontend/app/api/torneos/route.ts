@@ -18,11 +18,11 @@ export async function GET(request: Request) {
     const supabase = getServerClient()
     const { data, error } = await supabase
       .from('torneo_miembros')
-      .select('torneos (id, nombre, invite_code, creado_por, created_at)')
+      .select('estado, torneos (id, nombre, descripcion, invite_code, creado_por, created_at)')
       .eq('usuario_id', usuario_id)
 
     if (error) throw error
-    const torneos = data?.map((d: any) => d.torneos).filter(Boolean) ?? []
+    const torneos = data?.map((d: any) => ({ ...d.torneos, estado: d.estado ?? 'activo' })).filter(Boolean) ?? []
     return NextResponse.json({ data: torneos })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
@@ -31,14 +31,14 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
-    const { nombre, creado_por } = await request.json()
+    const { nombre, descripcion, creado_por } = await request.json()
     if (!nombre?.trim() || !creado_por) {
       return NextResponse.json({ error: 'nombre and creado_por required' }, { status: 400 })
     }
     const supabase = getServerClient()
     const { data, error } = await supabase
       .from('torneos')
-      .insert({ nombre: nombre.trim(), creado_por })
+      .insert({ nombre: nombre.trim(), descripcion: descripcion?.trim() || null, creado_por })
       .select()
       .single()
     if (error) throw error

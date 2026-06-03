@@ -12,16 +12,29 @@ function getServerClient() {
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
   const invite_code = searchParams.get('invite_code')
+  const usuario_id = searchParams.get('usuario_id')
   if (!invite_code) return NextResponse.json({ error: 'invite_code required' }, { status: 400 })
   try {
     const supabase = getServerClient()
     const { data, error } = await supabase
       .from('torneos')
-      .select('id, nombre')
+      .select('id, nombre, descripcion')
       .eq('invite_code', invite_code)
       .single()
     if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    return NextResponse.json({ id: data.id, nombre: data.nombre })
+
+    let estado: string | null = null
+    if (usuario_id) {
+      const { data: mem } = await supabase
+        .from('torneo_miembros')
+        .select('estado')
+        .eq('torneo_id', data.id)
+        .eq('usuario_id', usuario_id)
+        .maybeSingle()
+      estado = mem?.estado ?? null
+    }
+
+    return NextResponse.json({ id: data.id, nombre: data.nombre, descripcion: data.descripcion, estado })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

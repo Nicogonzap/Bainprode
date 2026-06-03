@@ -26,17 +26,24 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Torneo no encontrado' }, { status: 404 })
     }
 
-    const { error: joinError } = await supabase
+    // Verificar si ya existe una membresía
+    const { data: existing } = await supabase
       .from('torneo_miembros')
-      .insert({ torneo_id: torneo.id, usuario_id })
-    if (joinError) {
-      if (joinError.code === '23505') {
-        return NextResponse.json({ torneo_id: torneo.id, already_member: true })
-      }
-      throw joinError
+      .select('estado')
+      .eq('torneo_id', torneo.id)
+      .eq('usuario_id', usuario_id)
+      .maybeSingle()
+
+    if (existing) {
+      return NextResponse.json({ torneo_id: torneo.id, estado: existing.estado })
     }
 
-    return NextResponse.json({ torneo_id: torneo.id, torneo_nombre: torneo.nombre })
+    const { error: joinError } = await supabase
+      .from('torneo_miembros')
+      .insert({ torneo_id: torneo.id, usuario_id, estado: 'pendiente' })
+    if (joinError) throw joinError
+
+    return NextResponse.json({ torneo_id: torneo.id, torneo_nombre: torneo.nombre, estado: 'pendiente' })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
