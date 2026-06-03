@@ -1,7 +1,7 @@
 ﻿'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3, Save } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save, Trophy } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -24,7 +24,7 @@ const DAYS_ES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES'
 const MONTHS_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
-type ViewMode = 'fecha' | 'grupo'
+type ViewMode = 'fecha' | 'grupo' | 'fase'
 type Predictions = Record<string, { home: number | ''; away: number | '' }>
 
 type ApiEquipo = { id: string; nombre_pais: string; codigo_iso: string; bandera_url: string | null }
@@ -44,6 +44,83 @@ type StandingRow = {
   id: string; name: string; code: string; url: string | null
   pj: number; gf: number; gc: number; dg: number; pts: number
 }
+
+// ── Cuadro de eliminatorias del Mundial 2026 (plantillas). ──
+// Fuente: bracket oficial FIFA / sorteo dic-2025. Equipos aún no definidos,
+// por eso se muestran como "1° Grupo X" / "2° Grupo Y" / "3° mejor (...)".
+type BracketMatch = { num: number; home: string; away: string; date: string; time: string; venue: string }
+type BracketPhase = { key: string; label: string; matches: BracketMatch[] }
+
+const BRACKET: BracketPhase[] = [
+  {
+    key: '16vos',
+    label: '16VOS DE FINAL',
+    matches: [
+      { num: 73, home: '2° Grupo A', away: '2° Grupo B', date: '28 JUN', time: '16.00', venue: 'SoFi Stadium, Los Ángeles' },
+      { num: 76, home: '1° Grupo C', away: '2° Grupo F', date: '29 JUN', time: '14.00', venue: 'NRG Stadium, Houston' },
+      { num: 74, home: '1° Grupo E', away: '3° mejor (A/B/C/D/F)', date: '29 JUN', time: '17.30', venue: 'Gillette Stadium, Boston' },
+      { num: 75, home: '1° Grupo F', away: '2° Grupo C', date: '29 JUN', time: '22.00', venue: 'Estadio BBVA, Monterrey' },
+      { num: 78, home: '2° Grupo E', away: '2° Grupo I', date: '30 JUN', time: '14.00', venue: 'AT&T Stadium, Dallas' },
+      { num: 77, home: '1° Grupo I', away: '3° mejor (C/D/F/G/H)', date: '30 JUN', time: '18.00', venue: 'MetLife Stadium, Nueva York/NJ' },
+      { num: 79, home: '1° Grupo A', away: '3° mejor (C/E/F/H/I)', date: '30 JUN', time: '22.00', venue: 'Estadio Azteca, Ciudad de México' },
+      { num: 80, home: '1° Grupo L', away: '3° mejor (E/H/I/J/K)', date: '1 JUL', time: '13.00', venue: 'Mercedes-Benz Stadium, Atlanta' },
+      { num: 81, home: '1° Grupo D', away: '3° mejor (B/E/F/I/J)', date: '1 JUL', time: '17.00', venue: 'Levi’s Stadium, San Francisco' },
+      { num: 82, home: '1° Grupo G', away: '3° mejor (A/E/H/I/J)', date: '2 JUL', time: '17.00', venue: 'Lumen Field, Seattle' },
+      { num: 83, home: '2° Grupo K', away: '2° Grupo L', date: '2 JUL', time: '21.00', venue: 'BMO Field, Toronto' },
+      { num: 84, home: '1° Grupo H', away: '2° Grupo J', date: '2 JUL', time: '23.00', venue: 'SoFi Stadium, Los Ángeles' },
+      { num: 86, home: '1° Grupo J', away: '2° Grupo H', date: '3 JUL', time: '19.00', venue: 'Hard Rock Stadium, Miami' },
+      { num: 85, home: '1° Grupo B', away: '3° mejor (E/F/G/I/J)', date: '3 JUL', time: '20.00', venue: 'BC Place, Vancouver' },
+      { num: 88, home: '2° Grupo D', away: '2° Grupo G', date: '3 JUL', time: '21.00', venue: 'AT&T Stadium, Dallas' },
+      { num: 87, home: '1° Grupo K', away: '3° mejor (D/E/I/J/L)', date: '3 JUL', time: '22.30', venue: 'Arrowhead Stadium, Kansas City' },
+    ],
+  },
+  {
+    key: '8vos',
+    label: '8VOS DE FINAL',
+    matches: [
+      { num: 90, home: 'Ganador P73', away: 'Ganador P75', date: '4 JUL', time: '14.00', venue: 'NRG Stadium, Houston' },
+      { num: 89, home: 'Ganador P74', away: 'Ganador P77', date: '4 JUL', time: '18.00', venue: 'Lincoln Financial Field, Filadelfia' },
+      { num: 91, home: 'Ganador P76', away: 'Ganador P78', date: '5 JUL', time: '17.00', venue: 'MetLife Stadium, Nueva York/NJ' },
+      { num: 92, home: 'Ganador P79', away: 'Ganador P80', date: '5 JUL', time: '21.00', venue: 'Estadio Azteca, Ciudad de México' },
+      { num: 93, home: 'Ganador P83', away: 'Ganador P84', date: '6 JUL', time: '16.00', venue: 'AT&T Stadium, Dallas' },
+      { num: 94, home: 'Ganador P81', away: 'Ganador P82', date: '6 JUL', time: '21.00', venue: 'Lumen Field, Seattle' },
+      { num: 95, home: 'Ganador P86', away: 'Ganador P88', date: '7 JUL', time: '13.00', venue: 'Mercedes-Benz Stadium, Atlanta' },
+      { num: 96, home: 'Ganador P85', away: 'Ganador P87', date: '7 JUL', time: '17.00', venue: 'BC Place, Vancouver' },
+    ],
+  },
+  {
+    key: '4tos',
+    label: 'CUARTOS DE FINAL',
+    matches: [
+      { num: 97, home: 'Ganador P89', away: 'Ganador P90', date: '9 JUL', time: '17.00', venue: 'Gillette Stadium, Boston' },
+      { num: 98, home: 'Ganador P93', away: 'Ganador P94', date: '10 JUL', time: '16.00', venue: 'SoFi Stadium, Los Ángeles' },
+      { num: 99, home: 'Ganador P91', away: 'Ganador P92', date: '11 JUL', time: '18.00', venue: 'Hard Rock Stadium, Miami' },
+      { num: 100, home: 'Ganador P95', away: 'Ganador P96', date: '11 JUL', time: '22.00', venue: 'Arrowhead Stadium, Kansas City' },
+    ],
+  },
+  {
+    key: 'semis',
+    label: 'SEMIFINALES',
+    matches: [
+      { num: 101, home: 'Ganador P97', away: 'Ganador P98', date: '14 JUL', time: '16.00', venue: 'AT&T Stadium, Dallas' },
+      { num: 102, home: 'Ganador P99', away: 'Ganador P100', date: '15 JUL', time: '16.00', venue: 'Mercedes-Benz Stadium, Atlanta' },
+    ],
+  },
+  {
+    key: '3er_puesto',
+    label: 'TERCER PUESTO',
+    matches: [
+      { num: 103, home: 'Perdedor P101', away: 'Perdedor P102', date: '18 JUL', time: '18.00', venue: 'Hard Rock Stadium, Miami' },
+    ],
+  },
+  {
+    key: 'final',
+    label: 'FINAL',
+    matches: [
+      { num: 104, home: 'Ganador P101', away: 'Ganador P102', date: '19 JUL', time: '16.00', venue: 'MetLife Stadium, Nueva York/NJ' },
+    ],
+  },
+]
 
 function toDisplayMatch(p: ApiPartido): DisplayMatch {
   const d = new Date(p.fecha_hora)
@@ -199,6 +276,7 @@ function PrediccionesContent() {
           <nav className="flex items-center gap-1" role="tablist">
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
+            <ViewTab icon={<Trophy size={14} strokeWidth={2} />} label="Por fase" active={viewMode === 'fase'} onClick={() => setViewMode('fase')} />
           </nav>
         </div>
       </div>
@@ -207,18 +285,24 @@ function PrediccionesContent() {
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>Predicciones</h1>
             <p className="text-sm" style={{ color: BAIN.graySecondary }}>
-              {viewMode === 'grupo' ? 'Completá los resultados y guardá las predicciones de cada grupo.' : 'Partidos ordenados por fecha.'}
+              {viewMode === 'grupo'
+                ? 'Completá los resultados y guardá las predicciones de cada grupo.'
+                : viewMode === 'fecha'
+                ? 'Partidos ordenados por fecha.'
+                : 'Cuadro de eliminatorias. Los cruces se definen al terminar la fase de grupos.'}
             </p>
           </div>
-          <div className="rounded-md px-4 py-3" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
-            <p className="text-xs font-medium mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>CARGADAS</p>
-            <p className="text-xl font-bold tracking-tight" style={{ color: BAIN.black }}>
-              <span style={{ color: BAIN.red }}>{loadedCount}</span>
-              <span style={{ color: BAIN.grayTertiary }}> / {matches.length}</span>
-            </p>
-          </div>
+          {viewMode !== 'fase' && (
+            <div className="rounded-md px-4 py-3" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+              <p className="text-xs font-medium mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>CARGADAS</p>
+              <p className="text-xl font-bold tracking-tight" style={{ color: BAIN.black }}>
+                <span style={{ color: BAIN.red }}>{loadedCount}</span>
+                <span style={{ color: BAIN.grayTertiary }}> / {matches.length}</span>
+              </p>
+            </div>
+          )}
         </section>
-        {loading ? (
+        {loading && viewMode !== 'fase' ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
           </div>
@@ -238,7 +322,7 @@ function PrediccionesContent() {
               />
             ))}
           </>
-        ) : (
+        ) : viewMode === 'fecha' ? (
           <>
             {dayGroups.map((day, dayIdx) => (
               <section key={day.dateSort} className="mb-8 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${dayIdx * 50}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
@@ -246,6 +330,25 @@ function PrediccionesContent() {
                 <div className="flex flex-col gap-3">
                   {day.matches.map(m => (
                     <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={updatePrediction} onClear={clearPrediction} showGroup />
+                  ))}
+                </div>
+              </section>
+            ))}
+          </>
+        ) : (
+          <>
+            <div className="rounded-md p-4 mb-6 flex items-start gap-2" style={{ backgroundColor: '#FFF8E5', border: `1px solid #E0C97A` }}>
+              <span aria-hidden="true">ℹ️</span>
+              <p className="text-sm" style={{ color: '#7A5C00' }}>
+                Estos cruces son una vista previa del cuadro. Los equipos se confirman cuando termine la fase de grupos, así que por ahora no se pueden predecir.
+              </p>
+            </div>
+            {BRACKET.map((phase, pIdx) => (
+              <section key={phase.key} className="mb-8 animate-in fade-in slide-in-from-bottom-2" style={{ animationDelay: `${pIdx * 50}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
+                <h2 className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>{phase.label}</h2>
+                <div className="flex flex-col gap-3">
+                  {phase.matches.map(bm => (
+                    <BracketCard key={bm.num} match={bm} />
                   ))}
                 </div>
               </section>
@@ -366,6 +469,37 @@ function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; labe
       <span style={{ color: active ? BAIN.red : BAIN.graySecondary }}>{icon}</span>
       {label}
     </button>
+  )
+}
+
+// Tarjeta de cruce de eliminatorias (plantilla, sin equipos definidos aún).
+function BracketCard({ match }: { match: BracketMatch }) {
+  return (
+    <div className="rounded-md" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, padding: '20px' }}>
+      <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
+        <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
+          PARTIDO {match.num} · {match.date} · {match.time}
+        </span>
+        <span className="text-xs" style={{ color: BAIN.graySecondary }}>{match.venue}</span>
+      </div>
+      <div className="grid grid-cols-3 items-center gap-3">
+        <div className="flex items-center gap-2 justify-end">
+          <div className="text-right hidden sm:block min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: BAIN.graySecondary }}>{match.home}</p>
+          </div>
+          <div className="rounded-full flex-shrink-0" style={{ width: '32px', height: '32px', backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }} />
+          <input type="text" disabled placeholder="—" className="w-12 h-10 text-center text-lg font-bold rounded-md" style={{ border: `1px solid ${BAIN.grayBorder}`, backgroundColor: BAIN.grayBg, color: BAIN.grayTertiary, cursor: 'not-allowed' }} aria-label="Predicción no disponible aún" />
+        </div>
+        <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
+        <div className="flex items-center gap-2 justify-start">
+          <input type="text" disabled placeholder="—" className="w-12 h-10 text-center text-lg font-bold rounded-md" style={{ border: `1px solid ${BAIN.grayBorder}`, backgroundColor: BAIN.grayBg, color: BAIN.grayTertiary, cursor: 'not-allowed' }} aria-label="Predicción no disponible aún" />
+          <div className="rounded-full flex-shrink-0" style={{ width: '32px', height: '32px', backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}` }} />
+          <div className="hidden sm:block min-w-0">
+            <p className="text-sm font-bold truncate" style={{ color: BAIN.graySecondary }}>{match.away}</p>
+          </div>
+        </div>
+      </div>
+    </div>
   )
 }
 
