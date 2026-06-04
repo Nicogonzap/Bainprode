@@ -224,7 +224,7 @@ function PrediccionesContent() {
 
       {/* Toolbar sticky con guardado global */}
       <div className="sticky top-16 z-40" style={{ backgroundColor: BAIN.white, borderBottom: `1px solid ${BAIN.grayBorder}` }}>
-        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between gap-4 h-14">
+        <div className="max-w-[1200px] mx-auto px-3 sm:px-6 flex items-center justify-between gap-2 h-14">
           <nav className="flex items-center gap-1" role="tablist">
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
@@ -234,7 +234,7 @@ function PrediccionesContent() {
             type="button"
             onClick={saveAll}
             disabled={saving || !user}
-            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold flex-shrink-0 transition-all"
+            className="flex items-center gap-1.5 px-3 sm:px-4 py-2 rounded-md text-sm font-bold flex-shrink-0 transition-all"
             style={{
               backgroundColor: saving ? BAIN.grayBorder : BAIN.red,
               color: saving ? BAIN.graySecondary : BAIN.white,
@@ -243,14 +243,14 @@ function PrediccionesContent() {
             }}
           >
             {saving
-              ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${BAIN.graySecondary} transparent transparent transparent` }} />Guardando…</>
-              : <><Save size={14} strokeWidth={2.5} />Guardar ({loadedCount})</>
+              ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${BAIN.graySecondary} transparent transparent transparent` }} /><span className="hidden sm:inline">Guardando…</span></>
+              : <><Save size={14} strokeWidth={2.5} /><span className="hidden sm:inline">Guardar</span> ({loadedCount})</>
             }
           </button>
         </div>
       </div>
 
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
+      <main className="flex-1 max-w-[1200px] w-full mx-auto px-4 sm:px-6 py-6 sm:py-10">
         <section className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>Predicciones</h1>
@@ -334,12 +334,12 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
 
   return (
     <section className="mb-6 rounded-md overflow-hidden animate-in fade-in slide-in-from-bottom-2" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${delay}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
-      <button type="button" onClick={() => setExpanded(s => !s)} className="w-full px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 rounded-md flex items-center justify-center font-bold text-base" style={{ backgroundColor: BAIN.black, color: BAIN.white }}>{groupKey}</div>
+      <button type="button" onClick={() => setExpanded(s => !s)} className="w-full px-4 sm:px-6 py-4 flex items-center justify-between gap-2 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-md flex items-center justify-center font-bold text-sm flex-shrink-0" style={{ backgroundColor: BAIN.black, color: BAIN.white }}>{groupKey}</div>
           <div className="text-left">
             <p className="text-base font-bold tracking-tight" style={{ color: BAIN.black }}>Grupo {groupKey}</p>
-            <p className="text-xs truncate max-w-xs" style={{ color: BAIN.graySecondary }}>{teamNames}</p>
+            <p className="text-xs truncate" style={{ color: BAIN.graySecondary }}>{teamNames}</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
@@ -350,7 +350,7 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
         </div>
       </button>
       {expanded && (
-        <div className="px-6 pb-6 grid grid-cols-1 lg:grid-cols-5 gap-6" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+        <div className="px-3 sm:px-6 pb-4 sm:pb-6 grid grid-cols-1 lg:grid-cols-5 gap-4 sm:gap-6" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
           <div className="lg:col-span-3 pt-6 flex flex-col gap-4">
             <p className="text-xs font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS DEL GRUPO</p>
             <div className="flex flex-col gap-3">
@@ -409,9 +409,9 @@ function StandingsTable({ standings }: { standings: StandingRow[] }) {
 
 function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" role="tab" aria-selected={active} onClick={onClick} className="text-sm font-medium px-4 py-3 transition-colors whitespace-nowrap flex items-center gap-2 h-14" style={{ color: active ? BAIN.black : BAIN.graySecondary, borderBottom: `2px solid ${active ? BAIN.red : 'transparent'}` }}>
+    <button type="button" role="tab" aria-selected={active} onClick={onClick} className="text-sm font-medium px-2 sm:px-4 py-3 transition-colors whitespace-nowrap flex items-center gap-1.5 h-14" style={{ color: active ? BAIN.black : BAIN.graySecondary, borderBottom: `2px solid ${active ? BAIN.red : 'transparent'}` }}>
       <span style={{ color: active ? BAIN.red : BAIN.graySecondary }}>{icon}</span>
-      {label}
+      <span className="hidden sm:inline">{label}</span>
     </button>
   )
 }
@@ -453,15 +453,15 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
       </div>
       <div className="grid grid-cols-3 items-center gap-3">
         <div className="flex items-center gap-2 justify-end">
-          <div className="text-right hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.homeName}</p></div>
+          <div className="min-w-0 flex flex-col items-end"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.homeName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.home}</p></div>
           <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />
-          <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
         </div>
         <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
         <div className="flex items-center gap-2 justify-start">
-          <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
           <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />
-          <div className="hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.awayName}</p></div>
+          <div className="min-w-0 flex flex-col items-start"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.awayName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.away}</p></div>
         </div>
       </div>
       {!compact && hasPrediction && !isMatchLocked && (
