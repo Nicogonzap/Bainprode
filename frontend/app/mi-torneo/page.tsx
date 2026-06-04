@@ -312,8 +312,8 @@ function MisTorneosContent() {
         nombre: 'Ranking General — Prode Mundial 2026',
         participantes: lb.length,
         posicion: userEntry?.posicion ?? null,
-        puntosPrimero: lb[0]?.puntos ?? 0,
-        puntosPropios: userEntry?.puntos ?? 0,
+        puntosPrimero: lb[0]?.puntos_totales ?? 0,
+        puntosPropios: userEntry?.puntos_totales ?? 0,
       }
 
       const torneosList: any[] = torneosJson.data ?? []
