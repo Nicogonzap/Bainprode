@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useMemo, useEffect } from 'react'
-import { ChevronDown, ChevronUp, ChevronsUpDown, Globe, MapPin, Briefcase, Trophy } from 'lucide-react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
+import { ChevronDown, ChevronUp, ChevronsUpDown } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { useAuth } from '@/lib/auth-context'
@@ -25,31 +25,25 @@ type Row = {
   puntos_totales: number
   partidos_puntuados: number
   usuario_id: string
-  grupo_id: string
-  nombre_torneo: string
   oficina: string | null
   tenure: string | null
 }
 
+type Torneo = { id: string; nombre: string }
+
 type SortKey = 'pos' | 'puntos_totales' | 'partidos_puntuados'
 type SortDir = 'asc' | 'desc'
-type ScopeKey = 'overall'
-
-const SCOPES = [
-  { key: 'overall' as const, label: 'Overall', icon: <Globe size={14} strokeWidth={2} />, description: 'Todos los participantes' },
-]
 
 function initials(nombre: string) {
-  return nombre
-    .split(' ')
-    .slice(0, 2)
-    .map((w) => w[0]?.toUpperCase() ?? '')
-    .join('')
+  return nombre.split(' ').slice(0, 2).map((w) => w[0]?.toUpperCase() ?? '').join('')
 }
 
 function Avatar({ initials: i, size = 'md' }: { initials: string; size?: 'sm' | 'md' | 'lg' }) {
   const dim = size === 'lg' ? 'w-16 h-16 text-base' : size === 'sm' ? 'w-8 h-8 text-xs' : 'w-12 h-12 text-sm'
-  return <span className={`${dim} rounded-full flex items-center justify-center font-bold flex-shrink-0`} style={{ backgroundColor: BAIN.grayBg, color: BAIN.black }}>{i}</span>
+  return (
+    <span className={`${dim} rounded-full flex items-center justify-center font-bold flex-shrink-0`}
+      style={{ backgroundColor: BAIN.grayBg, color: BAIN.black }}>{i}</span>
+  )
 }
 
 export default function TablaPage() {
@@ -58,25 +52,64 @@ export default function TablaPage() {
   const [loading, setLoading] = useState(true)
   const [sortKey, setSortKey] = useState<SortKey>('pos')
   const [sortDir, setSortDir] = useState<SortDir>('asc')
+  const [torneos, setTorneos] = useState<Torneo[]>([])
+  const [selectedId, setSelectedId] = useState<string | null>(null)
 
+  // Cargar torneos del usuario
   useEffect(() => {
-    fetch('/api/leaderboard')
+    if (!user) return
+    fetch(`/api/torneos?usuario_id=${user.id}`)
       .then((r) => r.json())
       .then(({ data }) => {
-        if (!data) return
-        setRows(
-          data.map((r: any, idx: number) => ({
-            ...r,
-            pos: r.posicion ?? idx + 1,
-            initials: initials(r.nombre_usuario ?? '?'),
-            oficina: r.oficina ?? null,
-            tenure: r.tenure ?? null,
-          }))
-        )
+        const activos = (data ?? []).filter((t: any) => (t.estado ?? 'activo') === 'activo')
+        setTorneos(activos.map((t: any) => ({ id: t.id, nombre: t.nombre })))
+      })
+      .catch(() => {})
+  }, [user])
+
+  const loadData = useCallback((torneoId: string | null) => {
+    setLoading(true)
+    const url = torneoId ? `/api/torneos/${torneoId}` : '/api/leaderboard'
+    fetch(url)
+      .then((r) => r.json())
+      .then((json) => {
+        if (torneoId) {
+          // /api/torneos/{id} returns { members: [{id, nombre_usuario, puntos, tenure, ...}] }
+          const members: any[] = json.members ?? []
+          setRows(
+            members.map((m: any, idx: number) => ({
+              pos: idx + 1,
+              nombre_usuario: m.nombre_usuario ?? [m.nombre, m.apellido].filter(Boolean).join(' ') ?? '?',
+              initials: initials(m.nombre_usuario ?? [m.nombre, m.apellido].filter(Boolean).join(' ') ?? '?'),
+              puntos_totales: m.puntos ?? 0,
+              partidos_puntuados: 0,
+              usuario_id: m.id,
+              oficina: m.oficina ?? null,
+              tenure: m.tenure ?? null,
+            }))
+          )
+        } else {
+          // /api/leaderboard returns { data: [{usuario_id, nombre_usuario, puntos_totales, posicion, ...}] }
+          const data: any[] = json.data ?? []
+          setRows(
+            data.map((r: any, idx: number) => ({
+              pos: r.posicion ?? idx + 1,
+              nombre_usuario: r.nombre_usuario ?? '?',
+              initials: initials(r.nombre_usuario ?? '?'),
+              puntos_totales: r.puntos_totales ?? 0,
+              partidos_puntuados: r.partidos_puntuados ?? 0,
+              usuario_id: r.usuario_id,
+              oficina: r.oficina ?? null,
+              tenure: r.tenure ?? null,
+            }))
+          )
+        }
       })
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
+
+  useEffect(() => { loadData(selectedId) }, [selectedId, loadData])
 
   const sorted = useMemo(() => {
     return [...rows].sort((a, b) => {
@@ -99,24 +132,58 @@ export default function TablaPage() {
   const top3 = sorted.slice(0, 3)
   const podiumOrder = top3.length === 3 ? [top3[1], top3[0], top3[2]] : top3
   const currentRow = sorted.find((r) => r.usuario_id === user?.id)
+  const selectedNombre = selectedId ? (torneos.find((t) => t.id === selectedId)?.nombre ?? '') : 'Ranking General'
+  const showPreds = selectedId === null
 
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: BAIN.grayBg }}>
       <TopNav activePage="tabla" />
 
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
-        <section className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
+        <section className="mb-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
           <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>Resultados</h1>
-          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Ranking de participantes del prode.</p>
+          <p className="text-sm mb-5" style={{ color: BAIN.graySecondary }}>Ranking de participantes del prode.</p>
+
+          {/* Selector de torneo */}
+          <div className="flex gap-2 overflow-x-auto pb-1" style={{ scrollbarWidth: 'none' }}>
+            <button
+              type="button"
+              onClick={() => { setSelectedId(null); setSortKey('pos'); setSortDir('asc') }}
+              className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors"
+              style={{
+                backgroundColor: selectedId === null ? BAIN.red : BAIN.white,
+                color: selectedId === null ? BAIN.white : BAIN.graySecondary,
+                border: `1px solid ${selectedId === null ? BAIN.red : BAIN.grayBorder}`,
+              }}
+            >
+              Ranking General
+            </button>
+            {torneos.map((t) => (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => { setSelectedId(t.id); setSortKey('pos'); setSortDir('asc') }}
+                className="flex-shrink-0 px-4 py-2 rounded-full text-xs font-bold transition-colors"
+                style={{
+                  backgroundColor: selectedId === t.id ? BAIN.red : BAIN.white,
+                  color: selectedId === t.id ? BAIN.white : BAIN.graySecondary,
+                  border: `1px solid ${selectedId === t.id ? BAIN.red : BAIN.grayBorder}`,
+                }}
+              >
+                {t.nombre}
+              </button>
+            ))}
+          </div>
         </section>
 
         {/* Mi posición */}
         {currentRow && (
-          <section className="mb-6 rounded-md p-4 flex items-center justify-between animate-in fade-in duration-500" style={{ backgroundColor: BAIN.redLightBg, border: `1px solid ${BAIN.red}40` }}>
+          <section className="mb-6 rounded-md p-4 flex items-center justify-between animate-in fade-in duration-500"
+            style={{ backgroundColor: BAIN.redLightBg, border: `1px solid ${BAIN.red}40` }}>
             <div className="flex items-center gap-3">
               <Avatar initials={currentRow.initials} size="md" />
               <div>
-                <p className="text-xs font-bold uppercase" style={{ color: BAIN.red, letterSpacing: '0.08em' }}>TU POSICIÓN</p>
+                <p className="text-xs font-bold uppercase" style={{ color: BAIN.red, letterSpacing: '0.08em' }}>TU POSICIÓN — {selectedNombre}</p>
                 <p className="text-base font-bold" style={{ color: BAIN.black }}>{currentRow.nombre_usuario}</p>
               </div>
             </div>
@@ -130,10 +197,11 @@ export default function TablaPage() {
         {/* Podio */}
         {podiumOrder.length === 3 && (
           <section className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8 items-end">
-            {podiumOrder.map((p, idx) => {
+            {podiumOrder.map((p) => {
               const isFirst = p.pos === 1
               return (
-                <div key={p.usuario_id} className="rounded-md p-6 text-center transition-shadow hover:shadow-sm" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, borderTop: isFirst ? `4px solid ${BAIN.red}` : `1px solid ${BAIN.grayBorder}` }}>
+                <div key={p.usuario_id} className="rounded-md p-6 text-center transition-shadow hover:shadow-sm"
+                  style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, borderTop: isFirst ? `4px solid ${BAIN.red}` : `1px solid ${BAIN.grayBorder}` }}>
                   <p className="text-xs font-bold uppercase mb-3" style={{ color: isFirst ? BAIN.red : BAIN.graySecondary, letterSpacing: '0.08em' }}>{p.pos}° LUGAR</p>
                   <div className="flex justify-center mb-3"><Avatar initials={p.initials} size={isFirst ? 'lg' : 'md'} /></div>
                   <p className="font-bold tracking-tight mb-1" style={{ color: BAIN.black, fontSize: isFirst ? '1rem' : '0.875rem' }}>{p.nombre_usuario}</p>
@@ -148,7 +216,10 @@ export default function TablaPage() {
         {/* Tabla */}
         <section className="rounded-md overflow-hidden" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
           {loading ? (
-            <div className="py-10 text-center"><p className="text-sm" style={{ color: BAIN.graySecondary }}>Cargando ranking…</p></div>
+            <div className="py-10 flex justify-center">
+              <div className="w-5 h-5 rounded-full border-2 border-t-transparent animate-spin"
+                style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -163,34 +234,44 @@ export default function TablaPage() {
                     </th>
                     <th className="text-left text-xs font-bold uppercase px-4 py-3 hidden lg:table-cell" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>OFICINA</th>
                     <th className="text-left text-xs font-bold uppercase px-4 py-3 hidden xl:table-cell" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>TENURE</th>
-                    <th className="text-right text-xs font-bold uppercase px-4 py-3 hidden sm:table-cell cursor-pointer" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }} onClick={() => handleSort('partidos_puntuados')}>
-                      <span className="inline-flex items-center gap-1 flex-row-reverse">PRED. <SortIcon active={sortKey === 'partidos_puntuados'} dir={sortDir} /></span>
-                    </th>
+                    {showPreds && (
+                      <th className="text-right text-xs font-bold uppercase px-4 py-3 hidden sm:table-cell cursor-pointer" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }} onClick={() => handleSort('partidos_puntuados')}>
+                        <span className="inline-flex items-center gap-1 flex-row-reverse">PRED. <SortIcon active={sortKey === 'partidos_puntuados'} dir={sortDir} /></span>
+                      </th>
+                    )}
                   </tr>
                 </thead>
                 <tbody>
                   {sorted.map((row) => (
-                    <tr key={`${row.usuario_id}-${row.grupo_id}`} className="transition-colors hover:bg-gray-50" style={{ backgroundColor: row.usuario_id === user?.id ? BAIN.redLight : BAIN.white, borderTop: `1px solid ${BAIN.grayBorder}` }}>
+                    <tr key={row.usuario_id} className="transition-colors hover:bg-gray-50"
+                      style={{ backgroundColor: row.usuario_id === user?.id ? BAIN.redLight : BAIN.white, borderTop: `1px solid ${BAIN.grayBorder}` }}>
                       <td className="px-4 py-4"><span className="text-sm font-bold" style={{ color: BAIN.black }}>{row.pos}</span></td>
                       <td className="px-4 py-4">
                         <div className="flex items-center gap-3">
                           <Avatar initials={row.initials} size="sm" />
                           <span className="text-sm font-bold" style={{ color: BAIN.black }}>{row.nombre_usuario}</span>
                           {row.usuario_id === user?.id && (
-                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded" style={{ backgroundColor: BAIN.red, color: BAIN.white, letterSpacing: '0.06em' }}>VOS</span>
+                            <span className="text-[10px] font-bold uppercase px-1.5 py-0.5 rounded"
+                              style={{ backgroundColor: BAIN.red, color: BAIN.white, letterSpacing: '0.06em' }}>VOS</span>
                           )}
                         </div>
                       </td>
                       <td className="px-4 py-4 text-right"><span className="text-sm font-bold" style={{ color: BAIN.black }}>{row.puntos_totales}</span></td>
                       <td className="px-4 py-4 hidden lg:table-cell"><span className="text-sm" style={{ color: BAIN.graySecondary }}>{row.oficina ?? '—'}</span></td>
                       <td className="px-4 py-4 hidden xl:table-cell"><span className="text-sm" style={{ color: BAIN.graySecondary }}>{row.tenure ?? '—'}</span></td>
-                      <td className="px-4 py-4 text-right hidden sm:table-cell"><span className="text-sm" style={{ color: BAIN.black }}>{row.partidos_puntuados}</span></td>
+                      {showPreds && (
+                        <td className="px-4 py-4 text-right hidden sm:table-cell"><span className="text-sm" style={{ color: BAIN.black }}>{row.partidos_puntuados}</span></td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
               </table>
               {sorted.length === 0 && (
-                <div className="py-10 text-center"><p className="text-sm" style={{ color: BAIN.graySecondary }}>El ranking aparecerá cuando empiece el Mundial.</p></div>
+                <div className="py-10 text-center">
+                  <p className="text-sm" style={{ color: BAIN.graySecondary }}>
+                    {selectedId ? 'Este torneo no tiene participantes aún.' : 'El ranking aparecerá cuando empiece el Mundial.'}
+                  </p>
+                </div>
               )}
             </div>
           )}
