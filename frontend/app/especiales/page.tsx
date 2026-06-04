@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo, useEffect } from 'react'
 import { Lock, Trophy, Target, Sparkles, Star, Shield, Clock, Check } from 'lucide-react'
@@ -6,7 +6,6 @@ import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
 import { ToastProvider, useToast } from '@/components/toast'
-import { GROUPS, type GroupKey } from '@/lib/groups'
 import { useAuth } from '@/lib/auth-context'
 
 const BAIN = {
@@ -25,6 +24,8 @@ const BAIN = {
 
 const TOURNAMENT_START = new Date('2026-06-11T00:00:00')
 
+type Equipo = { id: string; nombre_pais: string; codigo_iso: string; logo_url: string | null; bandera_url: string | null }
+type Jugador = { id: string; nombre: string }
 type PlayerTeam = { player: string; team: string }
 
 type Specials = {
@@ -44,13 +45,19 @@ const INITIAL: Specials = {
   goldenGlove: { ...EMPTY_PT },
 }
 
-const ALL_TEAMS = (Object.keys(GROUPS) as GroupKey[])
-  .flatMap((g) => GROUPS[g].map((t) => ({ ...t, group: g })))
-  .sort((a, b) => a.name.localeCompare(b.name))
+function useEquipos() {
+  const [equipos, setEquipos] = useState<Equipo[]>([])
+  useEffect(() => {
+    fetch('/api/equipos')
+      .then((r) => r.json())
+      .then(({ data }) => setEquipos(data ?? []))
+      .catch(() => {})
+  }, [])
+  return equipos
+}
 
-// Hook para cargar jugadores desde la API según selección y posición
 function useJugadores(codigo_iso: string, posicion?: string) {
-  const [jugadores, setJugadores] = useState<{ id: string; nombre: string }[]>([])
+  const [jugadores, setJugadores] = useState<Jugador[]>([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
@@ -72,6 +79,7 @@ function useJugadores(codigo_iso: string, posicion?: string) {
 function EspecialesContent() {
   const { toast } = useToast()
   const { user } = useAuth()
+  const equipos = useEquipos()
   const [specials, setSpecials] = useState<Specials>(INITIAL)
   const [savedAt, setSavedAt] = useState<Date | null>(null)
   const [loading, setLoading] = useState(true)
@@ -198,54 +206,24 @@ function EspecialesContent() {
         ) : (
           <div className="flex flex-col gap-4">
 
-            {/* Campeon */}
             <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={50} isLocked={isLocked} isFilled={!!specials.champion}>
-              <TeamSelect value={specials.champion} onChange={(v) => setSpecials((s) => ({ ...s, champion: v }))} disabled={isLocked} />
+              <TeamSelect value={specials.champion} onChange={(v) => setSpecials((s) => ({ ...s, champion: v }))} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            {/* Goleador */}
             <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles convertidos" points={30} isLocked={isLocked} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
-              <PlayerTeamSelect
-                team={specials.topScorer.team}
-                player={specials.topScorer.player}
-                onTeamChange={(v) => setTeamPlayer('topScorer', 'team', v)}
-                onPlayerChange={(v) => setTeamPlayer('topScorer', 'player', v)}
-                disabled={isLocked}
-              />
+              <PlayerTeamSelect team={specials.topScorer.team} player={specials.topScorer.player} onTeamChange={(v) => setTeamPlayer('topScorer', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topScorer', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            {/* Asistente */}
             <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Máximo asistente" subtitle="Jugador con más asistencias" points={20} isLocked={isLocked} isFilled={!!specials.topAssister.player && !!specials.topAssister.team}>
-              <PlayerTeamSelect
-                team={specials.topAssister.team}
-                player={specials.topAssister.player}
-                onTeamChange={(v) => setTeamPlayer('topAssister', 'team', v)}
-                onPlayerChange={(v) => setTeamPlayer('topAssister', 'player', v)}
-                disabled={isLocked}
-              />
+              <PlayerTeamSelect team={specials.topAssister.team} player={specials.topAssister.player} onTeamChange={(v) => setTeamPlayer('topAssister', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topAssister', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            {/* Balon de Oro */}
             <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Balón de Oro" subtitle="Mejor jugador del torneo" points={25} isLocked={isLocked} isFilled={!!specials.ballonDOr.player && !!specials.ballonDOr.team}>
-              <PlayerTeamSelect
-                team={specials.ballonDOr.team}
-                player={specials.ballonDOr.player}
-                onTeamChange={(v) => setTeamPlayer('ballonDOr', 'team', v)}
-                onPlayerChange={(v) => setTeamPlayer('ballonDOr', 'player', v)}
-                disabled={isLocked}
-              />
+              <PlayerTeamSelect team={specials.ballonDOr.team} player={specials.ballonDOr.player} onTeamChange={(v) => setTeamPlayer('ballonDOr', 'team', v)} onPlayerChange={(v) => setTeamPlayer('ballonDOr', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            {/* Guante de Oro */}
             <PredictionCard icon={<Shield size={20} strokeWidth={1.75} />} title="Guante de Oro" subtitle="Mejor arquero del torneo" points={20} isLocked={isLocked} isFilled={!!specials.goldenGlove.player && !!specials.goldenGlove.team}>
-              <PlayerTeamSelect
-                team={specials.goldenGlove.team}
-                player={specials.goldenGlove.player}
-                onTeamChange={(v) => setTeamPlayer('goldenGlove', 'team', v)}
-                onPlayerChange={(v) => setTeamPlayer('goldenGlove', 'player', v)}
-                disabled={isLocked}
-                posicion="ARQ"
-              />
+              <PlayerTeamSelect team={specials.goldenGlove.team} player={specials.goldenGlove.player} onTeamChange={(v) => setTeamPlayer('goldenGlove', 'team', v)} onPlayerChange={(v) => setTeamPlayer('goldenGlove', 'player', v)} disabled={isLocked} equipos={equipos} posicion="ARQ" />
             </PredictionCard>
 
           </div>
@@ -305,34 +283,42 @@ function PredictionCard({ icon, title, subtitle, points, isLocked, isFilled, chi
   )
 }
 
-function TeamSelect({ value, onChange, disabled }: { value: string; onChange: (v: string) => void; disabled: boolean }) {
+function TeamSelect({ value, onChange, disabled, equipos }: {
+  value: string; onChange: (v: string) => void; disabled: boolean; equipos: Equipo[]
+}) {
+  const selected = equipos.find((e) => e.codigo_iso === value)
   return (
     <div className="flex items-center gap-3">
-      {value && <div className="flex-shrink-0"><CountryFlag code={value} size="md" /></div>}
+      {selected && (
+        <div className="flex-shrink-0">
+          <CountryFlag code={selected.codigo_iso} url={selected.bandera_url ?? undefined} size="md" />
+        </div>
+      )}
       <select value={value} onChange={(e) => onChange(e.target.value)} disabled={disabled}
         className="flex-1 px-3 py-2 rounded-md text-sm transition-colors focus:outline-none"
         style={{ border: `1px solid ${value ? BAIN.black : BAIN.grayBorder}`, backgroundColor: disabled ? BAIN.grayBg : BAIN.white, color: value ? BAIN.black : BAIN.graySecondary, cursor: disabled ? 'not-allowed' : 'pointer' }}>
         <option value="">— Elegí un país —</option>
-        {ALL_TEAMS.map((t) => <option key={`${t.code}-${t.group}`} value={t.code}>{t.name} (Grupo {t.group})</option>)}
+        {equipos.map((e) => <option key={e.id} value={e.codigo_iso}>{e.nombre_pais}</option>)}
       </select>
     </div>
   )
 }
 
-function PlayerTeamSelect({ team, player, onTeamChange, onPlayerChange, disabled, posicion }: {
+function PlayerTeamSelect({ team, player, onTeamChange, onPlayerChange, disabled, posicion, equipos }: {
   team: string; player: string
   onTeamChange: (v: string) => void; onPlayerChange: (v: string) => void
-  disabled: boolean; posicion?: string
+  disabled: boolean; posicion?: string; equipos: Equipo[]
 }) {
   const { jugadores, loading: loadingJugadores } = useJugadores(team, posicion)
-
+  const selectedEquipo = equipos.find((e) => e.codigo_iso === team)
   const playerInList = jugadores.some((j) => j.nombre === player)
 
   return (
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-      {/* Primer desplegable: seleccion */}
       <div className="flex items-center gap-2">
-        {team && <CountryFlag code={team} size="sm" />}
+        {selectedEquipo && (
+          <CountryFlag code={selectedEquipo.codigo_iso} url={selectedEquipo.bandera_url ?? undefined} size="sm" />
+        )}
         <select
           value={team}
           onChange={(e) => onTeamChange(e.target.value)}
@@ -340,11 +326,10 @@ function PlayerTeamSelect({ team, player, onTeamChange, onPlayerChange, disabled
           className="flex-1 px-3 py-2 rounded-md text-sm focus:outline-none transition-colors"
           style={{ border: `1px solid ${team ? BAIN.black : BAIN.grayBorder}`, backgroundColor: disabled ? BAIN.grayBg : BAIN.white, color: team ? BAIN.black : BAIN.graySecondary, cursor: disabled ? 'not-allowed' : 'pointer' }}>
           <option value="">— Elegí una selección —</option>
-          {ALL_TEAMS.map((t) => <option key={`${t.code}-${t.group}`} value={t.code}>{t.name}</option>)}
+          {equipos.map((e) => <option key={e.id} value={e.codigo_iso}>{e.nombre_pais}</option>)}
         </select>
       </div>
 
-      {/* Segundo desplegable: jugador (habilitado solo si hay seleccion) */}
       <select
         value={player}
         onChange={(e) => onPlayerChange(e.target.value)}
@@ -359,7 +344,6 @@ function PlayerTeamSelect({ team, player, onTeamChange, onPlayerChange, disabled
         <option value="">
           {!team ? '— Primero elegí selección —' : loadingJugadores ? 'Cargando jugadores...' : jugadores.length === 0 ? '— Sin jugadores cargados —' : '— Elegí un jugador —'}
         </option>
-        {/* Si el jugador guardado no está en la lista, lo mostramos igual */}
         {player && !playerInList && <option value={player}>{player}</option>}
         {jugadores.map((j) => <option key={j.id} value={j.nombre}>{j.nombre}</option>)}
       </select>
