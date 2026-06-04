@@ -1,10 +1,11 @@
-﻿'use client'
+'use client'
 
 import Link from 'next/link'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import { Menu, X } from 'lucide-react'
+import { useAuth } from '@/lib/auth-context'
 
 const BAIN = {
   red: '#CC0000',
@@ -17,7 +18,7 @@ const BAIN = {
 
 const BAIN_LOGO_SYMBOL = '/favicon.png'
 
-type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo'
+type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo' | 'admin'
 
 const NAV_LINKS: { href: string; label: string; key: ActivePage }[] = [
   { href: '/home', label: 'Inicio', key: 'home' },
@@ -33,13 +34,21 @@ function detectActive(pathname: string): ActivePage | null {
   if (pathname.startsWith('/especiales')) return 'especiales'
   if (pathname.startsWith('/tabla')) return 'tabla'
   if (pathname.startsWith('/mi-torneo')) return 'mi-torneo'
+  if (pathname.startsWith('/admin')) return 'admin'
   return null
 }
+
+const ADMIN_EMAIL = 'nicolas.gonzalezpedrini@bain.com'
 
 export function TopNav({ activePage }: { activePage?: ActivePage }) {
   const pathname = usePathname() || ''
   const active = activePage ?? detectActive(pathname)
   const [mobileOpen, setMobileOpen] = useState(false)
+  const { user } = useAuth()
+  const isAdmin = user?.email === ADMIN_EMAIL
+  const effectiveLinks = isAdmin
+    ? [...NAV_LINKS, { href: '/admin', label: 'Test', key: 'admin' as ActivePage }]
+    : NAV_LINKS
 
   return (
     <header
@@ -73,7 +82,7 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
 
         {/* Center: desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
-          {NAV_LINKS.map((link) => {
+          {effectiveLinks.map((link) => {
             const isActive = active === link.key
             return (
               <Link
@@ -117,7 +126,7 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
           style={{ backgroundColor: BAIN.white, borderTop: `1px solid ${BAIN.grayBorder}` }}
         >
           <nav className="max-w-[1200px] mx-auto px-6 py-2 flex flex-col">
-            {NAV_LINKS.map((link) => {
+            {effectiveLinks.map((link) => {
               const isActive = active === link.key
               return (
                 <Link
