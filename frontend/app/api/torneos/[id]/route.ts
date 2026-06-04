@@ -17,7 +17,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
       supabase.from('torneos').select('*').eq('id', id).single(),
       supabase
         .from('torneo_miembros')
-        .select('usuario_id, estado, joined_at, usuarios (id, nombre, apellido, nombre_usuario, tenure)')
+        .select('usuario_id, estado, joined_at')
         .eq('torneo_id', id)
         .eq('estado', 'activo'),
     ])
@@ -26,18 +26,20 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
 
     const memberIds = membersRes.data?.map((m: any) => m.usuario_id) ?? []
     let puntosMap: Record<string, number> = {}
+    let usuariosMap: Record<string, any> = {}
     if (memberIds.length > 0) {
-      const { data: puntosData } = await supabase
-        .from('historial_puntos')
-        .select('usuario_id, puntos')
-        .in('usuario_id', memberIds)
-      puntosData?.forEach((p: any) => {
+      const [puntosRes, usuariosRes] = await Promise.all([
+        supabase.from('historial_puntos').select('usuario_id, puntos').in('usuario_id', memberIds),
+        supabase.from('usuarios').select('id, nombre, apellido, nombre_usuario, tenure').in('id', memberIds),
+      ])
+      puntosRes.data?.forEach((p: any) => {
         puntosMap[p.usuario_id] = (puntosMap[p.usuario_id] ?? 0) + p.puntos
       })
+      usuariosRes.data?.forEach((u: any) => { usuariosMap[u.id] = u })
     }
 
     const members = (membersRes.data ?? [])
-      .map((m: any) => ({ ...m.usuarios, puntos: puntosMap[m.usuario_id] ?? 0 }))
+      .map((m: any) => ({ ...usuariosMap[m.usuario_id], puntos: puntosMap[m.usuario_id] ?? 0 }))
       .sort((a: any, b: any) => b.puntos - a.puntos)
 
     return NextResponse.json({ torneo: torneoRes.data, members })
