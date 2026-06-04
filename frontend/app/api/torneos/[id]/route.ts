@@ -14,13 +14,12 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   try {
     const supabase = getServerClient()
     const [torneoRes, membersRes] = await Promise.all([
-      supabase.from('torneos').select('*').eq('id', id).eq('activo', true).single(),
+      supabase.from('torneos').select('*').eq('id', id).single(),
       supabase
         .from('torneo_miembros')
         .select('usuario_id, estado, joined_at, usuarios (id, nombre, apellido, nombre_usuario, tenure)')
         .eq('torneo_id', id)
-        .eq('estado', 'activo')
-        .eq('activo', true),
+        .eq('estado', 'activo'),
     ])
     if (torneoRes.error) throw torneoRes.error
     if (membersRes.error) throw membersRes.error
