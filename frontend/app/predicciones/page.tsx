@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff, Lock } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -38,7 +38,7 @@ type DisplayMatch = {
   id: string; group: string
   home: string; homeUrl: string | null; homeName: string; homeId: string
   away: string; awayUrl: string | null; awayName: string; awayId: string
-  dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string
+  dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string; fecha_hora: string
 }
 type StandingRow = {
   id: string; name: string; code: string; url: string | null
@@ -66,6 +66,7 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
     dateSort, dateLabel, shortDate, time,
     venue: [p.estadio, p.ciudad].filter(Boolean).join(', '),
     estado: p.estado,
+    fecha_hora: p.fecha_hora,
   }
 }
 
@@ -393,6 +394,8 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
   showGroup?: boolean; compact?: boolean
 }) {
   const hasPrediction = prediction.home !== '' && prediction.away !== ''
+  const cutoffTime = new Date(new Date(match.fecha_hora).getTime() - 5 * 60 * 1000)
+  const isMatchLocked = new Date() >= cutoffTime || match.estado === 'finalizado' || match.estado === 'en_curso'
   return (
     <div className="rounded-md transition-all" style={{ backgroundColor: BAIN.white, border: `1px solid ${hasPrediction ? BAIN.success + '50' : BAIN.grayBorder}`, padding: compact ? '12px 14px' : '20px' }}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -400,11 +403,15 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
           <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
             {showGroup && `GRUPO ${match.group} · `}{match.shortDate} · {match.time}
           </span>
-          {hasPrediction && (
+          {isMatchLocked ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${BAIN.graySecondary}15`, color: BAIN.graySecondary }}>
+              <Lock size={9} strokeWidth={2.5} />Cerrada
+            </span>
+          ) : hasPrediction ? (
             <span className="inline-flex items-center justify-center w-4 h-4 rounded-full" style={{ backgroundColor: BAIN.success }}>
               <Check size={9} strokeWidth={3} color="white" />
             </span>
-          )}
+          ) : null}
         </div>
         {!compact && <span className="text-xs" style={{ color: BAIN.graySecondary }}>{match.venue}</span>}
       </div>
@@ -412,16 +419,16 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
         <div className="flex items-center gap-2 justify-end">
           <div className="text-right hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.homeName}</p></div>
           <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />
-          <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => onUpdate(match.id, 'home', e.target.value)} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.homeName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
         </div>
         <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
         <div className="flex items-center gap-2 justify-start">
-          <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => onUpdate(match.id, 'away', e.target.value)} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: BAIN.white, color: BAIN.black }} aria-label={`Goles de ${match.awayName}`} />
+          <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-12 h-10 text-center text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
           <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />
           <div className="hidden sm:block min-w-0"><p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{match.awayName}</p></div>
         </div>
       </div>
-      {!compact && hasPrediction && (
+      {!compact && hasPrediction && !isMatchLocked && (
         <div className="flex justify-end mt-3 pt-3" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
           <button type="button" onClick={() => onClear(match.id)} className="text-xs font-medium hover:underline" style={{ color: BAIN.graySecondary }}>Limpiar</button>
         </div>

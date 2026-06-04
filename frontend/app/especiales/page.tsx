@@ -23,6 +23,7 @@ const BAIN = {
 } as const
 
 const TOURNAMENT_START = new Date('2026-06-11T00:00:00')
+const GROUP_STAGE_END = new Date('2026-07-03T00:00:00')
 
 type Equipo = { id: string; nombre_pais: string; codigo_iso: string; logo_url: string | null; bandera_url: string | null }
 type Jugador = { id: string; nombre: string }
@@ -104,16 +105,23 @@ function EspecialesContent() {
       .finally(() => setLoading(false))
   }, [user])
 
-  const timeRemaining = useMemo(() => {
+  const { windowState, timeRemaining } = useMemo(() => {
     const now = new Date()
-    const diff = TOURNAMENT_START.getTime() - now.getTime()
-    if (diff <= 0) return null
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24))
-    const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
-    return { days, hours }
+    if (now < TOURNAMENT_START) {
+      const diff = TOURNAMENT_START.getTime() - now.getTime()
+      const days = Math.floor(diff / (1000 * 60 * 60 * 24))
+      const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
+      return { windowState: 'open' as const, timeRemaining: { days, hours } }
+    }
+    if (now < GROUP_STAGE_END) {
+      return { windowState: 'locked' as const, timeRemaining: null }
+    }
+    return { windowState: 'second' as const, timeRemaining: null }
   }, [])
 
-  const isLocked = timeRemaining === null
+  const isLocked = windowState === 'locked'
+  const isSecondWindow = windowState === 'second'
+  const isEditable = windowState === 'open' || windowState === 'second'
 
   const completedCount = useMemo(() => {
     let n = 0
@@ -126,7 +134,7 @@ function EspecialesContent() {
   }, [specials])
 
   const handleSave = async () => {
-    if (isLocked || !user) return
+    if (!isEditable || !user) return
     setSaving(true)
     try {
       const res = await fetch('/api/especiales', {
@@ -182,7 +190,21 @@ function EspecialesContent() {
             <Lock size={18} strokeWidth={2} style={{ color: BAIN.graySecondary, marginTop: '2px' }} />
             <div>
               <p className="text-sm font-bold mb-1" style={{ color: BAIN.black }}>Predicciones bloqueadas</p>
-              <p className="text-sm" style={{ color: BAIN.graySecondary }}>El Mundial ya empezó. Tus predicciones quedaron fijadas.</p>
+              <p className="text-sm" style={{ color: BAIN.graySecondary }}>El Mundial está en la fase de grupos. Se reabrirán una vez que termine.</p>
+            </div>
+          </section>
+        ) : isSecondWindow ? (
+          <section className="mb-8 rounded-md p-5 flex items-center justify-between gap-4" style={{ backgroundColor: '#FFF8E7', border: '1px solid #B7791F40' }}>
+            <div className="flex items-center gap-3">
+              <Sparkles size={18} strokeWidth={2} style={{ color: BAIN.amber }} />
+              <div>
+                <p className="text-sm font-bold" style={{ color: BAIN.black }}>Ventana 2 · Fase de grupos terminada</p>
+                <p className="text-xs" style={{ color: BAIN.graySecondary }}>Podés modificar tus predicciones, pero los puntos obtenidos serán reducidos al 50%</p>
+              </div>
+            </div>
+            <div className="hidden sm:block text-right">
+              <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>COMPLETADAS</p>
+              <p className="text-lg font-bold" style={{ color: BAIN.black }}><span style={{ color: BAIN.amber }}>{completedCount}</span><span style={{ color: BAIN.grayTertiary }}> / 5</span></p>
             </div>
           </section>
         ) : (
@@ -190,7 +212,7 @@ function EspecialesContent() {
             <div className="flex items-center gap-3">
               <Clock size={18} strokeWidth={2} style={{ color: BAIN.red }} />
               <div>
-                <p className="text-sm font-bold" style={{ color: BAIN.black }}>Faltan {timeRemaining.days} días y {timeRemaining.hours} horas</p>
+                <p className="text-sm font-bold" style={{ color: BAIN.black }}>Faltan {timeRemaining!.days} días y {timeRemaining!.hours} horas</p>
                 <p className="text-xs" style={{ color: BAIN.graySecondary }}>para que se cierren estas predicciones (11 jun · 00:00 ARG)</p>
               </div>
             </div>
@@ -206,30 +228,30 @@ function EspecialesContent() {
         ) : (
           <div className="flex flex-col gap-4">
 
-            <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={50} isLocked={isLocked} isFilled={!!specials.champion}>
+            <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={50} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.champion}>
               <TeamSelect value={specials.champion} onChange={(v) => setSpecials((s) => ({ ...s, champion: v }))} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles convertidos" points={30} isLocked={isLocked} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
+            <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles convertidos" points={30} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
               <PlayerTeamSelect team={specials.topScorer.team} player={specials.topScorer.player} onTeamChange={(v) => setTeamPlayer('topScorer', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topScorer', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Máximo asistente" subtitle="Jugador con más asistencias" points={20} isLocked={isLocked} isFilled={!!specials.topAssister.player && !!specials.topAssister.team}>
+            <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Máximo asistente" subtitle="Jugador con más asistencias" points={20} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.topAssister.player && !!specials.topAssister.team}>
               <PlayerTeamSelect team={specials.topAssister.team} player={specials.topAssister.player} onTeamChange={(v) => setTeamPlayer('topAssister', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topAssister', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Balón de Oro" subtitle="Mejor jugador del torneo" points={25} isLocked={isLocked} isFilled={!!specials.ballonDOr.player && !!specials.ballonDOr.team}>
+            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Balón de Oro" subtitle="Mejor jugador del torneo" points={25} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.ballonDOr.player && !!specials.ballonDOr.team}>
               <PlayerTeamSelect team={specials.ballonDOr.team} player={specials.ballonDOr.player} onTeamChange={(v) => setTeamPlayer('ballonDOr', 'team', v)} onPlayerChange={(v) => setTeamPlayer('ballonDOr', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Shield size={20} strokeWidth={1.75} />} title="Guante de Oro" subtitle="Mejor arquero del torneo" points={20} isLocked={isLocked} isFilled={!!specials.goldenGlove.player && !!specials.goldenGlove.team}>
+            <PredictionCard icon={<Shield size={20} strokeWidth={1.75} />} title="Guante de Oro" subtitle="Mejor arquero del torneo" points={20} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.goldenGlove.player && !!specials.goldenGlove.team}>
               <PlayerTeamSelect team={specials.goldenGlove.team} player={specials.goldenGlove.player} onTeamChange={(v) => setTeamPlayer('goldenGlove', 'team', v)} onPlayerChange={(v) => setTeamPlayer('goldenGlove', 'player', v)} disabled={isLocked} equipos={equipos} posicion="ARQ" />
             </PredictionCard>
 
           </div>
         )}
 
-        {!isLocked && (
+        {isEditable && (
           <div className="mt-8 flex flex-col items-center gap-3">
             <button type="button" onClick={handleSave} disabled={saving} className="px-8 py-3 rounded-md text-sm font-bold transition-colors flex items-center gap-2" style={{ backgroundColor: BAIN.red, color: BAIN.white, opacity: saving ? 0.7 : 1 }}>
               {savedAt ? <><Check size={16} strokeWidth={2.5} />Guardar cambios</> : saving ? 'Guardando…' : 'Guardar predicciones'}
@@ -240,6 +262,11 @@ function EspecialesContent() {
 
         <section className="mt-10 rounded-md p-6" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
           <h2 className="text-base font-bold tracking-tight mb-4" style={{ color: BAIN.black }}>Cómo suman puntos</h2>
+          {isSecondWindow && (
+            <p className="text-xs mb-3 px-2 py-1.5 rounded" style={{ backgroundColor: '#B7791F10', color: BAIN.amber, border: '1px solid #B7791F30' }}>
+              Ventana 2 activa: los puntos indicados se reducen al 50%
+            </p>
+          )}
           <ul className="space-y-2">
             <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Trophy size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Campeón del Mundial</span><span className="font-bold">50 pts</span></li>
             <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Target size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Goleador del torneo</span><span className="font-bold">30 pts</span></li>
@@ -255,9 +282,12 @@ function EspecialesContent() {
   )
 }
 
-function PredictionCard({ icon, title, subtitle, points, isLocked, isFilled, children }: {
-  icon: React.ReactNode; title: string; subtitle: string; points: number; isLocked: boolean; isFilled: boolean; children: React.ReactNode
+function PredictionCard({ icon, title, subtitle, points, isLocked, isFilled, secondWindow, children }: {
+  icon: React.ReactNode; title: string; subtitle: string; points: number; isLocked: boolean; isFilled: boolean; secondWindow?: boolean; children: React.ReactNode
 }) {
+  const displayPoints = secondWindow ? Math.floor(points / 2) : points
+  const ptColor = secondWindow ? BAIN.amber : BAIN.red
+  const ptBg = secondWindow ? '#B7791F15' : `${BAIN.red}15`
   return (
     <div className="rounded-md p-5 transition-all animate-in fade-in slide-in-from-bottom-2"
       style={{ backgroundColor: BAIN.white, border: `1px solid ${isFilled ? BAIN.success + '40' : BAIN.grayBorder}`, opacity: isLocked ? 0.85 : 1 }}>
@@ -274,8 +304,9 @@ function PredictionCard({ icon, title, subtitle, points, isLocked, isFilled, chi
           {isFilled && <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase px-2 py-0.5 rounded"
             style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, letterSpacing: '0.06em' }}>
             <Check size={10} strokeWidth={3} />CARGADA</span>}
-          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
-            style={{ backgroundColor: `${BAIN.red}15`, color: BAIN.red, letterSpacing: '0.06em' }}>+{points} PTS</span>
+          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded" style={{ backgroundColor: ptBg, color: ptColor, letterSpacing: '0.06em' }}>
+            {secondWindow && <span style={{ textDecoration: 'line-through', opacity: 0.6, marginRight: '4px' }}>{points}</span>}+{displayPoints} PTS
+          </span>
         </div>
       </div>
       {children}

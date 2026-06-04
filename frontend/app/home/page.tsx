@@ -66,8 +66,44 @@ function PredChip({ home, away }: { home: number; away: number }) {
 function MatchRow({ match, showScore, prediction }: {
   match: Partido; showScore?: boolean; prediction?: { home: number; away: number } | null
 }) {
+  const now = new Date()
+  const matchTime = new Date(match.fecha_hora)
+  const cutoffTime = new Date(matchTime.getTime() - 5 * 60 * 1000)
+  const isPast = matchTime < now
+  const isClosed = !isPast && now >= cutoffTime
+  const isToday = toArgDateStr(match.fecha_hora) === now.toLocaleDateString('en-CA', { timeZone: TZ })
   const hasScore = match.goles_local !== null && match.goles_visitante !== null
-  const lugar = [match.estadio, match.ciudad].filter(Boolean).join(' · ')
+
+  let rightContent: React.ReactNode
+  if (isPast) {
+    rightContent = prediction ? (
+      <div className="flex flex-col items-end gap-0.5">
+        <span className="text-[10px] font-bold" style={{ color: BAIN.success }}>Pred: {prediction.home}–{prediction.away}</span>
+        {hasScore && <span className="text-[10px]" style={{ color: BAIN.graySecondary }}>Real: {match.goles_local}–{match.goles_visitante}</span>}
+      </div>
+    ) : (
+      <span className="text-[10px] font-bold" style={{ color: BAIN.red }}>Sin predicción</span>
+    )
+  } else if (isClosed) {
+    rightContent = (
+      <div className="flex flex-col items-end gap-0.5">
+        {prediction ? <PredChip home={prediction.home} away={prediction.away} /> : <span className="text-[10px] font-bold" style={{ color: BAIN.red }}>Sin predicción</span>}
+        <span className="text-[10px]" style={{ color: BAIN.graySecondary }}>Predicción cerrada</span>
+      </div>
+    )
+  } else if (isToday) {
+    rightContent = (
+      <div className="flex flex-col items-end gap-0.5">
+        {prediction ? <PredChip home={prediction.home} away={prediction.away} /> : <span className="text-[10px] font-bold" style={{ color: BAIN.red }}>Sin predicción</span>}
+        <span className="text-[10px]" style={{ color: BAIN.graySecondary }}>Cierra {formatHour(cutoffTime.toISOString())} ARG</span>
+      </div>
+    )
+  } else {
+    rightContent = prediction
+      ? <PredChip home={prediction.home} away={prediction.away} />
+      : <span className="text-[10px] font-bold" style={{ color: BAIN.red }}>Sin predicción</span>
+  }
+
   return (
     <div className="flex items-center justify-between py-2.5 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
       style={{ borderBottom: `1px solid ${BAIN.grayBorder}` }}>
@@ -96,10 +132,7 @@ function MatchRow({ match, showScore, prediction }: {
         </div>
       </div>
       <div className="flex items-center gap-2 flex-shrink-0 ml-2">
-        {prediction && <PredChip home={prediction.home} away={prediction.away} />}
-        {!prediction && lugar && (
-          <span className="text-xs" style={{ color: BAIN.graySecondary }}>{lugar}</span>
-        )}
+        {rightContent}
       </div>
     </div>
   )
@@ -351,9 +384,15 @@ function HomePageContent() {
                   <p className="text-sm font-medium mb-1" style={{ color: BAIN.black }}>
                     {formatDate(nextMatch.fecha_hora)} · {formatHour(nextMatch.fecha_hora)} ARG
                   </p>
-                  <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>
-                    {nextMatch.estadio}{nextMatch.ciudad ? `, ${nextMatch.ciudad}` : ''}
-                  </p>
+                  <div className="mb-6 flex items-center gap-2 flex-wrap">
+                    {nextMatchPred
+                      ? <span className="text-xs font-bold px-2 py-0.5 rounded" style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, border: `1px solid ${BAIN.success}30` }}>Predicción cargada</span>
+                      : <span className="text-xs font-bold" style={{ color: BAIN.red }}>Sin predicción</span>
+                    }
+                    {(nextMatch.estadio || nextMatch.ciudad) && (
+                      <span className="text-xs" style={{ color: BAIN.grayTertiary }}>· {nextMatch.estadio}{nextMatch.ciudad ? `, ${nextMatch.ciudad}` : ''}</span>
+                    )}
+                  </div>
                   <div className="flex items-center justify-around mb-4">
                     <div className="flex flex-col items-center gap-2">
                       <CountryFlag code={nextMatch.equipo_local.codigo_iso} url={nextMatch.equipo_local.bandera_url ?? undefined} size="lg" />
@@ -420,7 +459,7 @@ function HomePageContent() {
                               {pred.home}–{pred.away}
                             </span>
                           ) : (
-                            <span className="text-xs flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
+                            <span className="text-[10px] font-bold flex-shrink-0 px-1" style={{ color: BAIN.red }}>Sin pred.</span>
                           )}
                           <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
                             <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_visitante.nombre_pais}</span>
