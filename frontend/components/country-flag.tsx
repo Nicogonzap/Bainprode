@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 const ISO3_TO_ISO2: Record<string, string> = {
   ARG: 'ar', BRA: 'br', MEX: 'mx', USA: 'us', CAN: 'ca',
@@ -52,7 +52,8 @@ export function CountryFlag({
   className?: string
 }) {
   const { cls, imgW } = SIZES[size]
-  const src = url ?? `https://flagcdn.com/w${imgW}/${getISO2(code)}.png`
+  const iso2 = getISO2(code)
+  const src = url ?? (iso2.includes('-') ? `https://flagcdn.com/${iso2}.svg` : `https://flagcdn.com/w${imgW}/${iso2}.png`)
 
   return (
     <span
