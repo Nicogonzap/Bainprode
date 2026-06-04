@@ -1,6 +1,6 @@
-﻿'use client'
+'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { Target, Trophy, X, Copy, Check } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
@@ -19,6 +19,7 @@ const BAIN = {
   grayBorder: '#E5E5E5',
   graySecondary: '#666666',
   grayTertiary: '#999999',
+  success: '#0F7B3E',
 } as const
 
 const TZ = 'America/Argentina/Buenos_Aires'
@@ -32,6 +33,7 @@ type Partido = {
 }
 type Torneo = { id: string; nombre: string; invite_code: string; creado_por: string }
 type UserProfile = { nombre: string | null; apellido: string | null; nombre_usuario: string | null }
+type PredMap = Record<string, { home: number; away: number }>
 
 function toArgDateStr(iso: string) {
   return new Date(iso).toLocaleDateString('en-CA', { timeZone: TZ })
@@ -48,7 +50,22 @@ function grupoLabel(grupo_fase: string | null) {
   return upper.startsWith('GRUPO') ? upper : `Grupo ${upper}`
 }
 
-function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean }) {
+// Chip pequeño que muestra el marcador predicho
+function PredChip({ home, away }: { home: number; away: number }) {
+  return (
+    <span
+      className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+      style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, border: `1px solid ${BAIN.success}30` }}
+    >
+      <Check size={9} strokeWidth={3} />
+      {home}–{away}
+    </span>
+  )
+}
+
+function MatchRow({ match, showScore, prediction }: {
+  match: Partido; showScore?: boolean; prediction?: { home: number; away: number } | null
+}) {
   const hasScore = match.goles_local !== null && match.goles_visitante !== null
   const lugar = [match.estadio, match.ciudad].filter(Boolean).join(' · ')
   return (
@@ -78,14 +95,19 @@ function MatchRow({ match, showScore }: { match: Partido; showScore?: boolean })
           </span>
         </div>
       </div>
-      {lugar && (
-        <span className="text-xs flex-shrink-0 ml-2" style={{ color: BAIN.graySecondary }}>{lugar}</span>
-      )}
+      <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+        {prediction && <PredChip home={prediction.home} away={prediction.away} />}
+        {!prediction && lugar && (
+          <span className="text-xs" style={{ color: BAIN.graySecondary }}>{lugar}</span>
+        )}
+      </div>
     </div>
   )
 }
 
-function DateGroup({ label, matches, showScore }: { label: string; matches: Partido[]; showScore?: boolean }) {
+function DateGroup({ label, matches, showScore, predictions }: {
+  label: string; matches: Partido[]; showScore?: boolean; predictions?: PredMap
+}) {
   return (
     <div>
       <h3 className="text-xs font-bold uppercase mb-3 tracking-widest" style={{ color: BAIN.graySecondary }}>
@@ -94,7 +116,9 @@ function DateGroup({ label, matches, showScore }: { label: string; matches: Part
       {matches.length === 0 ? (
         <p className="text-sm py-2" style={{ color: BAIN.grayTertiary }}>Sin partidos.</p>
       ) : (
-        matches.map(m => <MatchRow key={m.id} match={m} showScore={showScore} />)
+        matches.map(m => (
+          <MatchRow key={m.id} match={m} showScore={showScore} prediction={predictions?.[m.id] ?? null} />
+        ))
       )}
     </div>
   )
@@ -205,7 +229,7 @@ function CreateTorneoModal({ userId, onClose, onCreated }: {
 function HomePageContent() {
   const { user } = useAuth()
   const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [prediccionesCount, setPrediccionesCount] = useState(0)
+  const [predicciones, setPredicciones] = useState<PredMap>({})
   const [puntosTotales, setPuntosTotales] = useState<number | null>(null)
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [loadingPartidos, setLoadingPartidos] = useState(true)
@@ -217,9 +241,16 @@ function HomePageContent() {
     supabase.from('usuarios').select('nombre, apellido, nombre_usuario')
       .eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data) setProfile(data) })
-    supabase.from('predicciones').select('id', { count: 'exact', head: true })
-      .eq('usuario_id', user.id)
-      .then(({ count }) => setPrediccionesCount(count ?? 0))
+    // Cargar predicciones via API route (usa service role, no depende de RLS)
+    fetch(`/api/predicciones?usuario_id=${user.id}`)
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (!data) return
+        const map: PredMap = {}
+        for (const p of data) map[p.partido_id] = { home: p.goles_local, away: p.goles_visitante }
+        setPredicciones(map)
+      })
+      .catch(() => {})
     supabase.from('historial_puntos').select('puntos')
       .eq('usuario_id', user.id)
       .then(({ data }) => {
@@ -236,11 +267,14 @@ function HomePageContent() {
       .catch(() => {})
   }, [user])
 
+  const prediccionesCount = useMemo(() => Object.keys(predicciones).length, [predicciones])
+
   const now = new Date()
   const todayStr = now.toLocaleDateString('en-CA', { timeZone: TZ })
 
   const upcomingMatches = partidos.filter(m => new Date(m.fecha_hora) > now).slice(0, 3)
   const nextMatch = upcomingMatches[0] ?? null
+  const nextMatchPred = nextMatch ? predicciones[nextMatch.id] ?? null : null
 
   const pastMatches = partidos
     .filter(m => new Date(m.fecha_hora) < now)
@@ -260,10 +294,12 @@ function HomePageContent() {
 
   const nombreDisplay = profile?.nombre ?? profile?.nombre_usuario?.split(' ')[0] ?? user?.email?.split('@')[0] ?? 'Usuario'
 
+  const totalPartidos = partidos.length || 104
+
   const kpis = [
     { label: 'PUNTOS TOTALES', value: String(puntosTotales ?? 0), caption: '0 partidos jugados' },
     { label: 'POSICIÓN EN TU TORNEO', value: '—', caption: torneos[0]?.nombre ?? 'Sin torneo' },
-    { label: 'PREDICCIONES CARGADAS', value: `${prediccionesCount} / 104`, caption: `Faltan ${104 - prediccionesCount} partidos` },
+    { label: 'PREDICCIONES CARGADAS', value: `${prediccionesCount} / ${totalPartidos}`, caption: prediccionesCount === 0 ? 'Aún sin predicciones' : `Faltan ${totalPartidos - prediccionesCount} partidos` },
     { label: '% DE ACIERTOS', value: '—', caption: 'Disponible cuando empiece el Mundial' },
   ]
 
@@ -318,12 +354,26 @@ function HomePageContent() {
                   <p className="text-xs mb-6" style={{ color: BAIN.graySecondary }}>
                     {nextMatch.estadio}{nextMatch.ciudad ? `, ${nextMatch.ciudad}` : ''}
                   </p>
-                  <div className="flex items-center justify-around mb-6">
+                  <div className="flex items-center justify-around mb-4">
                     <div className="flex flex-col items-center gap-2">
                       <CountryFlag code={nextMatch.equipo_local.codigo_iso} url={nextMatch.equipo_local.bandera_url ?? undefined} size="lg" />
                       <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_local.nombre_pais}</span>
                     </div>
-                    <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
+                    <div className="flex flex-col items-center gap-1">
+                      {nextMatchPred ? (
+                        <span className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>
+                          {nextMatchPred.home} – {nextMatchPred.away}
+                        </span>
+                      ) : (
+                        <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
+                      )}
+                      {nextMatchPred && (
+                        <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded"
+                          style={{ backgroundColor: `${BAIN.success}15`, color: BAIN.success, letterSpacing: '0.06em' }}>
+                          Tu predicción
+                        </span>
+                      )}
+                    </div>
                     <div className="flex flex-col items-center gap-2">
                       <CountryFlag code={nextMatch.equipo_visitante.codigo_iso} url={nextMatch.equipo_visitante.bandera_url ?? undefined} size="lg" />
                       <span className="text-sm font-bold" style={{ color: BAIN.black }}>{nextMatch.equipo_visitante.nombre_pais}</span>
@@ -337,7 +387,7 @@ function HomePageContent() {
               )}
               <Link href="/predicciones" className="block w-full text-center font-bold py-2.5 px-4 rounded-md text-sm"
                 style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
-                Cargar predicción
+                {nextMatchPred ? 'Ver / modificar predicciones' : 'Cargar predicciones'}
               </Link>
             </div>
 
@@ -351,26 +401,40 @@ function HomePageContent() {
                 <p className="text-sm py-4" style={{ color: BAIN.graySecondary }}>No hay próximos partidos.</p>
               ) : (
                 <ul className="space-y-1">
-                  {upcomingMatches.map((m, i) => (
-                    <li key={m.id} className="py-3 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
-                      style={{ borderBottom: i < upcomingMatches.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
-                      <div className="flex items-center justify-between mb-1.5">
-                        <span className="text-xs" style={{ color: BAIN.graySecondary }}>{formatDate(m.fecha_hora)}</span>
-                        <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }}>{grupoLabel(m.grupo_fase)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                          <CountryFlag code={m.equipo_local.codigo_iso} url={m.equipo_local.bandera_url ?? undefined} size="sm" />
-                          <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_local.nombre_pais}</span>
+                  {upcomingMatches.map((m, i) => {
+                    const pred = predicciones[m.id] ?? null
+                    return (
+                      <li key={m.id} className="py-3 -mx-2 px-2 rounded hover:bg-gray-50 transition-colors"
+                        style={{ borderBottom: i < upcomingMatches.length - 1 ? `1px solid ${BAIN.grayBorder}` : 'none' }}>
+                        <div className="flex items-center justify-between mb-1.5">
+                          <span className="text-xs" style={{ color: BAIN.graySecondary }}>{formatDate(m.fecha_hora)}</span>
+                          <span className="text-xs uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.06em' }}>{grupoLabel(m.grupo_fase)}</span>
                         </div>
-                        <span className="text-xs flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
-                        <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
-                          <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_visitante.nombre_pais}</span>
-                          <CountryFlag code={m.equipo_visitante.codigo_iso} url={m.equipo_visitante.bandera_url ?? undefined} size="sm" />
+                        <div className="flex items-center gap-2">
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                            <CountryFlag code={m.equipo_local.codigo_iso} url={m.equipo_local.bandera_url ?? undefined} size="sm" />
+                            <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_local.nombre_pais}</span>
+                          </div>
+                          {pred ? (
+                            <span className="text-sm font-bold flex-shrink-0 px-2" style={{ color: BAIN.black }}>
+                              {pred.home}–{pred.away}
+                            </span>
+                          ) : (
+                            <span className="text-xs flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
+                          )}
+                          <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                            <span className="text-sm font-medium truncate" style={{ color: BAIN.black }}>{m.equipo_visitante.nombre_pais}</span>
+                            <CountryFlag code={m.equipo_visitante.codigo_iso} url={m.equipo_visitante.bandera_url ?? undefined} size="sm" />
+                          </div>
                         </div>
-                      </div>
-                    </li>
-                  ))}
+                        {pred && (
+                          <p className="text-[10px] font-bold uppercase mt-1.5 text-right" style={{ color: BAIN.success, letterSpacing: '0.06em' }}>
+                            ✓ predicción cargada
+                          </p>
+                        )}
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
             </div>
@@ -415,9 +479,9 @@ function HomePageContent() {
             <p className="text-sm py-6 text-center" style={{ color: BAIN.graySecondary }}>Cargando partidos...</p>
           ) : (
             <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-              <DateGroup label="Partidos recientes" matches={recentMatches} showScore />
-              <DateGroup label="Partidos de hoy" matches={todayMatches} showScore />
-              <DateGroup label="Próximos partidos" matches={proximosMatches} />
+              <DateGroup label="Partidos recientes" matches={recentMatches} showScore predictions={predicciones} />
+              <DateGroup label="Partidos de hoy" matches={todayMatches} showScore predictions={predicciones} />
+              <DateGroup label="Próximos partidos" matches={proximosMatches} predictions={predicciones} />
             </div>
           )}
         </section>
