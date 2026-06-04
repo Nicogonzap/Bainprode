@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -9,17 +9,18 @@ function getServerClient() {
   )
 }
 
-export async function GET(request: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function GET(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const supabase = getServerClient()
     const [torneoRes, membersRes] = await Promise.all([
-      supabase.from('torneos').select('*').eq('id', id).single(),
+      supabase.from('torneos').select('*').eq('id', id).eq('activo', true).single(),
       supabase
         .from('torneo_miembros')
         .select('usuario_id, estado, joined_at, usuarios (id, nombre, apellido, nombre_usuario, tenure)')
         .eq('torneo_id', id)
-        .eq('estado', 'activo'),
+        .eq('estado', 'activo')
+        .eq('activo', true),
     ])
     if (torneoRes.error) throw torneoRes.error
     if (membersRes.error) throw membersRes.error
@@ -46,8 +47,8 @@ export async function GET(request: Request, { params }: { params: { id: string }
   }
 }
 
-export async function PATCH(request: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
     const { nombre, descripcion, usuario_id } = await request.json()
     if (!usuario_id) return NextResponse.json({ error: 'usuario_id required' }, { status: 400 })
@@ -71,10 +72,9 @@ export async function PATCH(request: Request, { params }: { params: { id: string
   }
 }
 
-export async function DELETE(request: Request, { params }: { params: { id: string } }) {
-  const { id } = params
+export async function DELETE(request: Request, { params }: { params: Promise<{ id: string }> }) {
+  const { id } = await params
   try {
-    // usuario_id viene por query param para evitar problemas con body en DELETE
     const { searchParams } = new URL(request.url)
     const usuario_id = searchParams.get('usuario_id')
     if (!usuario_id) return NextResponse.json({ error: 'usuario_id required' }, { status: 400 })
@@ -89,7 +89,7 @@ export async function DELETE(request: Request, { params }: { params: { id: strin
       return NextResponse.json({ error: 'Solo el creador puede eliminar el torneo' }, { status: 403 })
     }
 
-    const { error } = await supabase.from('torneos').delete().eq('id', id)
+    const { error } = await supabase.from('torneos').update({ activo: false }).eq('id', id)
     if (error) throw error
     return NextResponse.json({ ok: true })
   } catch (err: any) {

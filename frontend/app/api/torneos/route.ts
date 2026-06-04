@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -18,11 +18,14 @@ export async function GET(request: Request) {
     const supabase = getServerClient()
     const { data, error } = await supabase
       .from('torneo_miembros')
-      .select('estado, torneos (id, nombre, descripcion, invite_code, creado_por, created_at)')
+      .select('estado, torneos (id, nombre, descripcion, invite_code, creado_por, created_at, activo)')
       .eq('usuario_id', usuario_id)
+      .eq('activo', true)
 
     if (error) throw error
-    const torneos = data?.map((d: any) => ({ ...d.torneos, estado: d.estado ?? 'activo' })).filter(Boolean) ?? []
+    const torneos = data
+      ?.map((d: any) => ({ ...d.torneos, estado: d.estado ?? 'activo' }))
+      .filter((t: any) => t && t.activo !== false) ?? []
     return NextResponse.json({ data: torneos })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })

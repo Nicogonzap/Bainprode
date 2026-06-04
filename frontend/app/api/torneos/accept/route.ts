@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -19,7 +19,7 @@ export async function POST(request: Request) {
     const supabase = getServerClient()
     const { error } = await supabase
       .from('torneo_miembros')
-      .update({ estado: 'activo' })
+      .update({ estado: 'activo', activo: true })
       .eq('torneo_id', torneo_id)
       .eq('usuario_id', usuario_id)
     if (error) throw error
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   }
 }
 
-// Salir de un torneo (activo) o rechazar invitacion (pendiente)
+// Salir de un torneo (activo) o rechazar invitacion (pendiente) -> soft delete
 export async function DELETE(request: Request) {
   try {
     const { torneo_id, usuario_id } = await request.json()
@@ -50,7 +50,7 @@ export async function DELETE(request: Request) {
 
     const { error } = await supabase
       .from('torneo_miembros')
-      .delete()
+      .update({ activo: false })
       .eq('torneo_id', torneo_id)
       .eq('usuario_id', usuario_id)
     if (error) throw error

@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -20,6 +20,7 @@ export async function GET(request: Request) {
       .from('torneos')
       .select('id, nombre, descripcion')
       .eq('invite_code', invite_code)
+      .eq('activo', true)
       .single()
     if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
@@ -30,6 +31,7 @@ export async function GET(request: Request) {
         .select('estado')
         .eq('torneo_id', data.id)
         .eq('usuario_id', usuario_id)
+        .eq('activo', true)
         .maybeSingle()
       estado = mem?.estado ?? null
     }
