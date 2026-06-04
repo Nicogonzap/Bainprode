@@ -267,6 +267,7 @@ function HomePageContent() {
   const [puntosTotales, setPuntosTotales] = useState<number | null>(null)
   const [posicion, setPosicion] = useState<number | null>(null)
   const [pctAciertos, setPctAciertos] = useState<number | null>(null)
+  const [pctExacto, setPctExacto] = useState<number | null>(null)
   const [evolucion, setEvolucion] = useState<{ fecha: string; puntos: number; acumulado: number }[]>([])
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [loadingPartidos, setLoadingPartidos] = useState(true)
@@ -297,7 +298,11 @@ function HomePageContent() {
         setPuntosTotales(total)
         const jugados = data.filter((r: any) => r.puntos !== null).length
         const aciertos = data.filter((r: any) => (r.puntos ?? 0) > 0).length
-        if (jugados > 0) setPctAciertos(Math.round((aciertos / jugados) * 100))
+        const exactos = data.filter((r: any) => r.es_exacto === true).length
+        if (jugados > 0) {
+          setPctAciertos(Math.round((aciertos / jugados) * 100))
+          setPctExacto(Math.round((exactos / jugados) * 100))
+        }
         // Build cumulative evolution data
         let acum = 0
         const evo = data.map((r: any) => {
@@ -363,7 +368,8 @@ function HomePageContent() {
     { label: 'PUNTOS TOTALES', value: String(puntosTotales ?? 0), caption: puntosTotales === null || puntosTotales === 0 ? 'Sin partidos puntuados' : 'Acumulados' },
     { label: 'POSICIÓN GENERAL', value: posicion !== null ? `${posicion}°` : '—', caption: posicion !== null ? 'Ranking general' : 'Sin partidos puntuados' },
     { label: 'PREDICCIONES CARGADAS', value: `${prediccionesCount} / ${totalPartidos}`, caption: prediccionesCount === 0 ? 'Aún sin predicciones' : `Faltan ${totalPartidos - prediccionesCount} partidos` },
-    { label: '% DE ACIERTOS', value: pctAciertos !== null ? `${pctAciertos}%` : '—', caption: pctAciertos !== null ? 'Partidos con resultado correcto' : 'Disponible cuando empiece' },
+    { label: 'RESULTADO ACERTADO', value: pctAciertos !== null ? `${pctAciertos}%` : '—', caption: pctAciertos !== null ? 'Ganador / empate correcto' : 'Disponible cuando empiece' },
+    { label: 'RESULTADO EXACTO', value: pctExacto !== null ? `${pctExacto}%` : '—', caption: pctExacto !== null ? 'Score exacto correcto' : 'Disponible cuando empiece' },
   ]
 
   return (
@@ -405,7 +411,7 @@ function HomePageContent() {
 
         <div className="max-w-[1200px] w-full mx-auto px-6 py-10">
 
-        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+        <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8">
           {kpis.map((k, i) => (
             <div key={k.label} className="rounded-md p-5 transition-all hover:shadow-sm animate-in fade-in slide-in-from-bottom-2"
               style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${i * 80}ms`, animationFillMode: 'backwards', animationDuration: '500ms' }}>
