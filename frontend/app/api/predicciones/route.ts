@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -20,7 +20,6 @@ export async function GET(request: Request) {
       .from('predicciones')
       .select('*')
       .eq('usuario_id', usuarioId)
-
     if (error) throw error
     return NextResponse.json({ data: data ?? [] })
   } catch (err: any) {
@@ -28,27 +27,33 @@ export async function GET(request: Request) {
   }
 }
 
+// Acepta un objeto o un array de predicciones
 export async function POST(request: Request) {
   try {
     const body = await request.json()
-    const { usuario_id, partido_id, goles_local, goles_visitante } = body
+    const items = Array.isArray(body) ? body : [body]
 
-    if (!usuario_id || !partido_id || goles_local === undefined || goles_visitante === undefined) {
-      return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+    if (items.length === 0) return NextResponse.json({ error: 'Sin predicciones' }, { status: 400 })
+
+    for (const item of items) {
+      const { usuario_id, partido_id, goles_local, goles_visitante } = item
+      if (!usuario_id || !partido_id || goles_local === undefined || goles_visitante === undefined) {
+        return NextResponse.json({ error: 'Faltan campos requeridos' }, { status: 400 })
+      }
     }
 
     const supabase = getServerClient()
-    const { data, error } = await supabase
+    const { error } = await supabase
       .from('predicciones')
       .upsert(
-        { usuario_id, partido_id, goles_local, goles_visitante },
+        items.map(({ usuario_id, partido_id, goles_local, goles_visitante }) => ({
+          usuario_id, partido_id, goles_local, goles_visitante,
+        })),
         { onConflict: 'usuario_id,partido_id' }
       )
-      .select()
-      .single()
 
     if (error) throw error
-    return NextResponse.json({ data })
+    return NextResponse.json({ ok: true, count: items.length })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }

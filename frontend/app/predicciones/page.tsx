@@ -1,7 +1,7 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3, Save } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -97,7 +97,7 @@ function PrediccionesContent() {
   const [matches, setMatches] = useState<DisplayMatch[]>([])
   const [loading, setLoading] = useState(true)
   const [predictions, setPredictions] = useState<Predictions>({})
-  const [savingGroup, setSavingGroup] = useState<string | null>(null)
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     fetch('/api/partidos?fase=grupos')
@@ -136,38 +136,43 @@ function PrediccionesContent() {
     setPredictions(prev => { const next = { ...prev }; delete next[matchId]; return next })
   }, [])
 
-  const saveGroup = useCallback(async (groupMatchIds: string[]) => {
+  // Guarda TODAS las predicciones con scores completos en un solo request
+  const saveAll = useCallback(async () => {
     if (!user) return
-    const toSave = groupMatchIds
-      .map(id => ({ id, pred: predictions[id] }))
-      .filter(({ pred }) => pred && pred.home !== '' && pred.away !== '')
+    const toSave = Object.entries(predictions)
+      .filter(([, p]) => p.home !== '' && p.away !== '')
+      .map(([partido_id, p]) => ({
+        usuario_id: user.id,
+        partido_id,
+        goles_local: Number(p.home),
+        goles_visitante: Number(p.away),
+      }))
 
     if (toSave.length === 0) {
       toast({ message: 'Completá al menos un resultado antes de guardar', type: 'info', duration: 2500 })
       return
     }
 
-    const groupKey = matches.find(m => m.id === groupMatchIds[0])?.group ?? ''
-    setSavingGroup(groupKey)
+    setSaving(true)
     try {
-      await Promise.all(toSave.map(({ id, pred }) =>
-        fetch('/api/predicciones', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario_id: user.id, partido_id: id, goles_local: pred!.home, goles_visitante: pred!.away }),
-        })
-      ))
+      const res = await fetch('/api/predicciones', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(toSave),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al guardar')
       toast({
-        message: `${toSave.length} predicción${toSave.length > 1 ? 'es' : ''} guardada${toSave.length > 1 ? 's' : ''} — Grupo ${groupKey}`,
+        message: `${toSave.length} predicción${toSave.length !== 1 ? 'es' : ''} guardada${toSave.length !== 1 ? 's' : ''}`,
         type: 'success',
         duration: 3000,
       })
-    } catch {
-      toast({ message: 'Error al guardar predicciones', type: 'error', duration: 2000 })
+    } catch (e: any) {
+      toast({ message: e.message || 'Error al guardar predicciones', type: 'error', duration: 3000 })
     } finally {
-      setSavingGroup(null)
+      setSaving(false)
     }
-  }, [user, predictions, matches, toast])
+  }, [user, predictions, toast])
 
   const dayGroups = useMemo(() => {
     const map = new Map<string, DisplayMatch[]>()
@@ -194,20 +199,40 @@ function PrediccionesContent() {
   return (
     <div className="min-h-screen flex flex-col" style={{ backgroundColor: BAIN.grayBg }}>
       <TopNav activePage="predicciones" />
+
+      {/* Toolbar sticky con guardado global */}
       <div className="sticky top-16 z-40" style={{ backgroundColor: BAIN.white, borderBottom: `1px solid ${BAIN.grayBorder}` }}>
-        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between gap-4">
+        <div className="max-w-[1200px] mx-auto px-6 flex items-center justify-between gap-4 h-14">
           <nav className="flex items-center gap-1" role="tablist">
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
           </nav>
+          <button
+            type="button"
+            onClick={saveAll}
+            disabled={saving || !user}
+            className="flex items-center gap-2 px-4 py-2 rounded-md text-sm font-bold flex-shrink-0 transition-all"
+            style={{
+              backgroundColor: saving ? BAIN.grayBorder : BAIN.red,
+              color: saving ? BAIN.graySecondary : BAIN.white,
+              cursor: saving ? 'not-allowed' : 'pointer',
+              opacity: !user ? 0.5 : 1,
+            }}
+          >
+            {saving
+              ? <><div className="w-3.5 h-3.5 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${BAIN.graySecondary} transparent transparent transparent` }} />Guardando…</>
+              : <><Save size={14} strokeWidth={2.5} />Guardar ({loadedCount})</>
+            }
+          </button>
         </div>
       </div>
+
       <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
         <section className="mb-8 flex flex-wrap items-end justify-between gap-4">
           <div>
             <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>Predicciones</h1>
             <p className="text-sm" style={{ color: BAIN.graySecondary }}>
-              {viewMode === 'grupo' ? 'Completá los resultados y guardá las predicciones de cada grupo.' : 'Partidos ordenados por fecha.'}
+              Cargá los resultados y guardá con el botón <strong>Guardar</strong> en la barra superior.
             </p>
           </div>
           <div className="rounded-md px-4 py-3" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
@@ -218,6 +243,7 @@ function PrediccionesContent() {
             </p>
           </div>
         </section>
+
         {loading ? (
           <div className="flex items-center justify-center py-20">
             <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
@@ -232,8 +258,6 @@ function PrediccionesContent() {
                 predictions={predictions}
                 onUpdate={updatePrediction}
                 onClear={clearPrediction}
-                onSave={() => saveGroup(g.matches.map(m => m.id))}
-                saving={savingGroup === g.group}
                 delay={gIdx * 50}
               />
             ))}
@@ -258,16 +282,14 @@ function PrediccionesContent() {
   )
 }
 
-function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, onSave, saving, delay }: {
+function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay }: {
   groupKey: string; matches: DisplayMatch[]
   predictions: Predictions
   onUpdate: (id: string, side: 'home' | 'away', v: string) => void
   onClear: (id: string) => void
-  onSave: () => void
-  saving: boolean
   delay: number
 }) {
-  const [expanded, setExpanded] = useState(groupKey === 'J')
+  const [expanded, setExpanded] = useState(false)
   const standings = useMemo(() => calcGroupStandings(matches, predictions), [matches, predictions])
   const filledCount = matches.filter(m => { const p = predictions[m.id]; return p && p.home !== '' && p.away !== '' }).length
 
@@ -291,7 +313,9 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, onSav
           </div>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs font-bold" style={{ color: filledCount === 6 ? BAIN.success : BAIN.graySecondary }}>{filledCount}/6</span>
+          <span className="text-xs font-bold" style={{ color: filledCount === 6 ? BAIN.success : filledCount > 0 ? BAIN.red : BAIN.graySecondary }}>
+            {filledCount === 6 ? <span className="flex items-center gap-1"><Check size={12} strokeWidth={3} />6/6</span> : `${filledCount}/6`}
+          </span>
           <ChevronDown size={18} strokeWidth={2} style={{ color: BAIN.graySecondary, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
         </div>
       </button>
@@ -304,16 +328,9 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, onSav
                 <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />
               ))}
             </div>
-            <button
-              type="button"
-              onClick={onSave}
-              disabled={saving}
-              className="flex items-center justify-center gap-2 w-full py-2.5 px-4 rounded-md text-sm font-bold transition-all"
-              style={{ backgroundColor: saving ? BAIN.grayBorder : BAIN.red, color: saving ? BAIN.graySecondary : BAIN.white, cursor: saving ? 'not-allowed' : 'pointer' }}
-            >
-              <Save size={15} strokeWidth={2.5} />
-              {saving ? 'Guardando…' : 'Guardar predicciones del grupo'}
-            </button>
+            <p className="text-xs text-center" style={{ color: BAIN.graySecondary }}>
+              Usá el botón <strong>Guardar</strong> en la barra superior para guardar todas las predicciones.
+            </p>
           </div>
           <div className="lg:col-span-2 pt-6">
             <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>SI TUS PREDICCIONES SE CUMPLEN</p>
@@ -362,7 +379,7 @@ function StandingsTable({ standings }: { standings: StandingRow[] }) {
 
 function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; label: string; active: boolean; onClick: () => void }) {
   return (
-    <button type="button" role="tab" aria-selected={active} onClick={onClick} className="text-sm font-medium px-4 py-3 transition-colors whitespace-nowrap flex items-center gap-2" style={{ color: active ? BAIN.black : BAIN.graySecondary, borderBottom: `2px solid ${active ? BAIN.red : 'transparent'}` }}>
+    <button type="button" role="tab" aria-selected={active} onClick={onClick} className="text-sm font-medium px-4 py-3 transition-colors whitespace-nowrap flex items-center gap-2 h-14" style={{ color: active ? BAIN.black : BAIN.graySecondary, borderBottom: `2px solid ${active ? BAIN.red : 'transparent'}` }}>
       <span style={{ color: active ? BAIN.red : BAIN.graySecondary }}>{icon}</span>
       {label}
     </button>
