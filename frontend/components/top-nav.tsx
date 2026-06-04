@@ -1,22 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
-import { Menu, X } from 'lucide-react'
+import { Menu, X, User } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
-
-const BAIN = {
-  red: '#CC0000',
-  black: '#000000',
-  white: '#FFFFFF',
-  grayBg: '#F5F5F5',
-  grayBorder: '#E5E5E5',
-  graySecondary: '#666666',
-} as const
-
-const BAIN_LOGO_SYMBOL = '/favicon.png'
 
 type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo' | 'admin'
 
@@ -40,6 +28,35 @@ function detectActive(pathname: string): ActivePage | null {
 
 const ADMIN_EMAIL = 'nicolas.gonzalezpedrini@bain.com'
 
+function BainLogo() {
+  return (
+    <Link href="/home" className="flex items-center gap-2.5 group flex-shrink-0">
+      {/* Wordmark */}
+      <div className="flex items-baseline gap-0.5 leading-none">
+        <span
+          className="font-black text-[22px] tracking-tight"
+          style={{ color: '#FFFFFF', letterSpacing: '-0.03em' }}
+        >
+          BAIN
+        </span>
+        <span
+          className="text-[11px] font-bold ml-1"
+          style={{ color: '#CC0000' }}
+        >
+          &amp; COMPANY
+        </span>
+      </div>
+      {/* Badge */}
+      <span
+        className="hidden sm:inline text-[9px] font-bold px-2 py-0.5 rounded-sm tracking-widest uppercase"
+        style={{ backgroundColor: '#CC000022', color: '#CC0000', border: '1px solid #CC000040' }}
+      >
+        USA · MEX · CAN 26
+      </span>
+    </Link>
+  )
+}
+
 export function TopNav({ activePage }: { activePage?: ActivePage }) {
   const pathname = usePathname() || ''
   const active = activePage ?? detectActive(pathname)
@@ -53,32 +70,10 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
   return (
     <header
       className="sticky top-0 z-50"
-      style={{ backgroundColor: BAIN.white, borderBottom: `1px solid ${BAIN.grayBorder}` }}
+      style={{ backgroundColor: '#000000', borderBottom: '1px solid #1a1a1a' }}
     >
       <div className="max-w-[1200px] mx-auto h-16 px-6 flex items-center justify-between">
-        {/* Left: logo */}
-        <Link href="/home" className="flex items-center gap-3 group">
-          <div className="relative w-8 h-8 flex-shrink-0">
-            <Image
-              src={BAIN_LOGO_SYMBOL}
-              alt="Bain & Company"
-              fill
-              sizes="32px"
-              className="object-contain"
-              priority
-              unoptimized
-            />
-          </div>
-          <span className="font-bold text-base tracking-tight" style={{ color: BAIN.black }}>
-            Bain
-          </span>
-          <span className="hidden md:inline" style={{ color: BAIN.grayBorder }}>
-            /
-          </span>
-          <span className="hidden md:inline text-sm" style={{ color: BAIN.graySecondary }}>
-            Prode Mundial 2026
-          </span>
-        </Link>
+        <BainLogo />
 
         {/* Center: desktop nav */}
         <nav className="hidden md:flex items-center gap-8">
@@ -88,14 +83,14 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
               <Link
                 key={link.key}
                 href={link.href}
-                className="relative text-sm font-medium transition-colors h-16 flex items-center hover:opacity-80"
-                style={{ color: isActive ? BAIN.black : BAIN.graySecondary }}
+                className="relative text-sm font-medium transition-opacity h-16 flex items-center hover:opacity-70"
+                style={{ color: isActive ? '#FFFFFF' : '#999999' }}
               >
                 {link.label}
                 {isActive && (
                   <span
                     className="absolute bottom-0 left-0 right-0"
-                    style={{ height: '2px', backgroundColor: BAIN.red }}
+                    style={{ height: '2px', backgroundColor: '#CC0000' }}
                     aria-hidden="true"
                   />
                 )}
@@ -104,12 +99,20 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
           })}
         </nav>
 
-        {/* Right: hamburger (mobile only) */}
-        <div className="flex items-center">
+        {/* Right: user icon + hamburger */}
+        <div className="flex items-center gap-3">
+          <Link
+            href="/perfil"
+            className="hidden md:flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-70"
+            style={{ backgroundColor: '#1a1a1a', color: '#999999' }}
+            aria-label="Mi perfil"
+          >
+            <User size={15} />
+          </Link>
           <button
             type="button"
-            className="md:hidden flex items-center justify-center w-9 h-9 rounded-md transition-colors"
-            style={{ color: BAIN.black }}
+            className="md:hidden flex items-center justify-center w-9 h-9 rounded-md"
+            style={{ color: '#FFFFFF' }}
             aria-label={mobileOpen ? 'Cerrar menú' : 'Abrir menú'}
             aria-expanded={mobileOpen}
             onClick={() => setMobileOpen((s) => !s)}
@@ -123,7 +126,7 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
       {mobileOpen && (
         <div
           className="md:hidden animate-in slide-in-from-top duration-200"
-          style={{ backgroundColor: BAIN.white, borderTop: `1px solid ${BAIN.grayBorder}` }}
+          style={{ backgroundColor: '#000000', borderTop: '1px solid #1a1a1a' }}
         >
           <nav className="max-w-[1200px] mx-auto px-6 py-2 flex flex-col">
             {effectiveLinks.map((link) => {
@@ -133,16 +136,24 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
                   key={link.key}
                   href={link.href}
                   onClick={() => setMobileOpen(false)}
-                  className="text-sm font-medium py-3 pl-3 transition-colors"
+                  className="text-sm font-medium py-3 pl-3 transition-opacity hover:opacity-70"
                   style={{
-                    color: isActive ? BAIN.black : BAIN.graySecondary,
-                    borderLeft: `3px solid ${isActive ? BAIN.red : 'transparent'}`,
+                    color: isActive ? '#FFFFFF' : '#999999',
+                    borderLeft: `3px solid ${isActive ? '#CC0000' : 'transparent'}`,
                   }}
                 >
                   {link.label}
                 </Link>
               )
             })}
+            <Link
+              href="/perfil"
+              onClick={() => setMobileOpen(false)}
+              className="text-sm font-medium py-3 pl-3 transition-opacity hover:opacity-70"
+              style={{ color: '#999999', borderLeft: '3px solid transparent' }}
+            >
+              Mi perfil
+            </Link>
           </nav>
         </div>
       )}

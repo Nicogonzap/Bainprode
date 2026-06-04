@@ -9,6 +9,7 @@ import { CountryFlag } from '@/components/country-flag'
 import { ToastProvider, useToast } from '@/components/toast'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 
 const BAIN = {
   red: '#CC0000',
@@ -32,7 +33,7 @@ type Partido = {
   equipo_local: Equipo; equipo_visitante: Equipo
 }
 type Torneo = { id: string; nombre: string; invite_code: string; creado_por: string }
-type UserProfile = { nombre: string | null; apellido: string | null; nombre_usuario: string | null }
+type UserProfile = { nombre: string | null; apellido: string | null; nombre_usuario: string | null; oficina: string | null; tenure: string | null }
 type PredMap = Record<string, { home: number; away: number }>
 
 function toArgDateStr(iso: string) {
@@ -68,7 +69,7 @@ function MatchRow({ match, showScore, prediction }: {
 }) {
   const now = new Date()
   const matchTime = new Date(match.fecha_hora)
-  const cutoffTime = new Date(matchTime.getTime() - 5 * 60 * 1000)
+  const cutoffTime = new Date(matchTime.getTime() - 60 * 60 * 1000)
   const isPast = matchTime < now
   const isClosed = !isPast && now >= cutoffTime
   const isToday = toArgDateStr(match.fecha_hora) === now.toLocaleDateString('en-CA', { timeZone: TZ })
@@ -264,6 +265,9 @@ function HomePageContent() {
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [predicciones, setPredicciones] = useState<PredMap>({})
   const [puntosTotales, setPuntosTotales] = useState<number | null>(null)
+  const [posicion, setPosicion] = useState<number | null>(null)
+  const [pctAciertos, setPctAciertos] = useState<number | null>(null)
+  const [evolucion, setEvolucion] = useState<{ fecha: string; puntos: number; acumulado: number }[]>([])
   const [partidos, setPartidos] = useState<Partido[]>([])
   const [loadingPartidos, setLoadingPartidos] = useState(true)
   const [torneos, setTorneos] = useState<Torneo[]>([])
@@ -271,7 +275,7 @@ function HomePageContent() {
 
   useEffect(() => {
     if (!user) return
-    supabase.from('usuarios').select('nombre, apellido, nombre_usuario')
+    supabase.from('usuarios').select('nombre, apellido, nombre_usuario, oficina, tenure')
       .eq('id', user.id).maybeSingle()
       .then(({ data }) => { if (data) setProfile(data) })
     // Cargar predicciones via API route (usa service role, no depende de RLS)
@@ -284,10 +288,28 @@ function HomePageContent() {
         setPredicciones(map)
       })
       .catch(() => {})
-    supabase.from('historial_puntos').select('puntos')
+    supabase.from('historial_puntos').select('puntos, es_exacto, calculado_en')
       .eq('usuario_id', user.id)
+      .order('calculado_en', { ascending: true })
       .then(({ data }) => {
-        if (data) setPuntosTotales(data.reduce((s: number, r: any) => s + (r.puntos ?? 0), 0))
+        if (!data) return
+        const total = data.reduce((s: number, r: any) => s + (r.puntos ?? 0), 0)
+        setPuntosTotales(total)
+        const jugados = data.filter((r: any) => r.puntos !== null).length
+        const aciertos = data.filter((r: any) => (r.puntos ?? 0) > 0).length
+        if (jugados > 0) setPctAciertos(Math.round((aciertos / jugados) * 100))
+        // Build cumulative evolution data
+        let acum = 0
+        const evo = data.map((r: any) => {
+          acum += r.puntos ?? 0
+          const d = new Date(r.calculado_en)
+          return {
+            fecha: `${d.getDate()}/${d.getMonth() + 1}`,
+            puntos: r.puntos ?? 0,
+            acumulado: acum,
+          }
+        })
+        setEvolucion(evo)
       })
     fetch('/api/partidos')
       .then(r => r.json())
@@ -297,6 +319,14 @@ function HomePageContent() {
     fetch(`/api/torneos?usuario_id=${user.id}`)
       .then(r => r.json())
       .then(({ data }) => { if (data) setTorneos(data) })
+      .catch(() => {})
+    fetch('/api/leaderboard')
+      .then(r => r.json())
+      .then(({ data }: { data: any[] }) => {
+        if (!data || !user) return
+        const entry = data.find((r: any) => r.usuario_id === user.id)
+        if (entry?.posicion) setPosicion(entry.posicion)
+      })
       .catch(() => {})
   }, [user])
 
@@ -330,10 +360,10 @@ function HomePageContent() {
   const totalPartidos = partidos.length || 104
 
   const kpis = [
-    { label: 'PUNTOS TOTALES', value: String(puntosTotales ?? 0), caption: '0 partidos jugados' },
-    { label: 'POSICIÓN EN TU TORNEO', value: '—', caption: torneos[0]?.nombre ?? 'Sin torneo' },
+    { label: 'PUNTOS TOTALES', value: String(puntosTotales ?? 0), caption: puntosTotales === null || puntosTotales === 0 ? 'Sin partidos puntuados' : 'Acumulados' },
+    { label: 'POSICIÓN GENERAL', value: posicion !== null ? `${posicion}°` : '—', caption: posicion !== null ? 'Ranking general' : 'Sin partidos puntuados' },
     { label: 'PREDICCIONES CARGADAS', value: `${prediccionesCount} / ${totalPartidos}`, caption: prediccionesCount === 0 ? 'Aún sin predicciones' : `Faltan ${totalPartidos - prediccionesCount} partidos` },
-    { label: '% DE ACIERTOS', value: '—', caption: 'Disponible cuando empiece el Mundial' },
+    { label: '% DE ACIERTOS', value: pctAciertos !== null ? `${pctAciertos}%` : '—', caption: pctAciertos !== null ? 'Partidos con resultado correcto' : 'Disponible cuando empiece' },
   ]
 
   return (
@@ -348,13 +378,32 @@ function HomePageContent() {
         />
       )}
 
-      <main className="flex-1 max-w-[1200px] w-full mx-auto px-6 py-10">
-        <section className="mb-8 animate-in fade-in slide-in-from-bottom-2 duration-500">
-          <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-2" style={{ color: BAIN.black }}>
-            Hola, {nombreDisplay}
-          </h1>
-          <p className="text-sm" style={{ color: BAIN.graySecondary }}>Prode Bain</p>
-        </section>
+      <main className="flex-1">
+        {/* Hero — black */}
+        <div style={{ backgroundColor: '#000000' }} className="relative overflow-hidden">
+          <div className="max-w-[1200px] mx-auto px-6 py-10 relative">
+            {/* 26 watermark */}
+            <span
+              className="absolute right-4 top-1/2 -translate-y-1/2 font-black select-none pointer-events-none hidden sm:block"
+              style={{ fontSize: '140px', lineHeight: 1, color: '#111111', letterSpacing: '-0.04em' }}
+              aria-hidden="true"
+            >26</span>
+            <div className="relative z-10 animate-in fade-in slide-in-from-bottom-2 duration-500">
+              <p className="text-xs font-bold uppercase mb-2" style={{ color: '#CC0000', letterSpacing: '0.12em' }}>PRODE BAIN · MUNDIAL 2026</p>
+              <h1 className="text-3xl md:text-4xl font-bold tracking-tight mb-1" style={{ color: '#FFFFFF', letterSpacing: '-0.02em' }}>
+                Hola, {nombreDisplay}
+              </h1>
+              {profile?.oficina && (
+                <p className="text-sm mt-1" style={{ color: '#888888' }}>{profile.oficina}{profile.tenure ? ` · ${profile.tenure}` : ''}</p>
+              )}
+              <p className="text-xs mt-3" style={{ color: '#555555' }}>
+                USA · MEX · CAN · 11 jun – 19 jul 2026
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="max-w-[1200px] w-full mx-auto px-6 py-10">
 
         <section className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
           {kpis.map((k, i) => (
@@ -524,6 +573,35 @@ function HomePageContent() {
             </div>
           )}
         </section>
+          {/* Evolución de puntos */}
+          {evolucion.length > 1 && (
+            <section className="rounded-md p-6 mt-6 animate-in fade-in duration-500"
+              style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: '700ms', animationFillMode: 'backwards' }}>
+              <h2 className="text-base font-bold tracking-tight mb-4" style={{ color: BAIN.black }}>Evolución de puntos</h2>
+              <div style={{ height: 200 }}>
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={evolucion} margin={{ top: 4, right: 8, left: -24, bottom: 0 }}>
+                    <CartesianGrid strokeDasharray="3 3" stroke={BAIN.grayBorder} />
+                    <XAxis dataKey="fecha" tick={{ fontSize: 10, fill: BAIN.graySecondary }} />
+                    <YAxis tick={{ fontSize: 10, fill: BAIN.graySecondary }} />
+                    <Tooltip
+                      contentStyle={{ fontSize: 12, border: `1px solid ${BAIN.grayBorder}`, borderRadius: 6 }}
+                      formatter={(v: number) => [`${v} pts`, 'Acumulado']}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="acumulado"
+                      stroke={BAIN.red}
+                      strokeWidth={2}
+                      dot={{ r: 3, fill: BAIN.red }}
+                      activeDot={{ r: 5 }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+            </section>
+          )}
+        </div>{/* end inner content */}
       </main>
 
       <Footer />

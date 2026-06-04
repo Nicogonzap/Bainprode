@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useState, useMemo, useEffect } from 'react'
 import { ChevronDown, ChevronUp, ChevronsUpDown, Globe, MapPin, Briefcase, Trophy } from 'lucide-react'
@@ -27,6 +27,8 @@ type Row = {
   usuario_id: string
   grupo_id: string
   nombre_torneo: string
+  oficina: string | null
+  tenure: string | null
 }
 
 type SortKey = 'pos' | 'puntos_totales' | 'partidos_puntuados'
@@ -67,6 +69,8 @@ export default function TablaPage() {
             ...r,
             pos: r.posicion ?? idx + 1,
             initials: initials(r.nombre_usuario ?? '?'),
+            oficina: r.oficina ?? null,
+            tenure: r.tenure ?? null,
           }))
         )
       })
@@ -157,6 +161,8 @@ export default function TablaPage() {
                     <th className="text-right text-xs font-bold uppercase px-4 py-3 cursor-pointer" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }} onClick={() => handleSort('puntos_totales')}>
                       <span className="inline-flex items-center gap-1 flex-row-reverse">PUNTOS <SortIcon active={sortKey === 'puntos_totales'} dir={sortDir} /></span>
                     </th>
+                    <th className="text-left text-xs font-bold uppercase px-4 py-3 hidden lg:table-cell" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>OFICINA</th>
+                    <th className="text-left text-xs font-bold uppercase px-4 py-3 hidden xl:table-cell" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>TENURE</th>
                     <th className="text-right text-xs font-bold uppercase px-4 py-3 hidden sm:table-cell cursor-pointer" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }} onClick={() => handleSort('partidos_puntuados')}>
                       <span className="inline-flex items-center gap-1 flex-row-reverse">PRED. <SortIcon active={sortKey === 'partidos_puntuados'} dir={sortDir} /></span>
                     </th>
@@ -176,6 +182,8 @@ export default function TablaPage() {
                         </div>
                       </td>
                       <td className="px-4 py-4 text-right"><span className="text-sm font-bold" style={{ color: BAIN.black }}>{row.puntos_totales}</span></td>
+                      <td className="px-4 py-4 hidden lg:table-cell"><span className="text-sm" style={{ color: BAIN.graySecondary }}>{row.oficina ?? '—'}</span></td>
+                      <td className="px-4 py-4 hidden xl:table-cell"><span className="text-sm" style={{ color: BAIN.graySecondary }}>{row.tenure ?? '—'}</span></td>
                       <td className="px-4 py-4 text-right hidden sm:table-cell"><span className="text-sm" style={{ color: BAIN.black }}>{row.partidos_puntuados}</span></td>
                     </tr>
                   ))}

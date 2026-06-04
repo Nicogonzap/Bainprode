@@ -22,7 +22,7 @@ const BAIN = {
   amber: '#B7791F',
 } as const
 
-const TOURNAMENT_START = new Date('2026-06-11T00:00:00')
+const TOURNAMENT_START = new Date('2026-06-11T19:00:00Z') // 11 jun 16:00 ARG (UTC-3)
 const GROUP_STAGE_END = new Date('2026-07-03T00:00:00')
 
 type Equipo = { id: string; nombre_pais: string; codigo_iso: string; logo_url: string | null; bandera_url: string | null }
@@ -111,7 +111,8 @@ function EspecialesContent() {
       const diff = TOURNAMENT_START.getTime() - now.getTime()
       const days = Math.floor(diff / (1000 * 60 * 60 * 24))
       const hours = Math.floor((diff / (1000 * 60 * 60)) % 24)
-      return { windowState: 'open' as const, timeRemaining: { days, hours } }
+      const minutes = Math.floor((diff / (1000 * 60)) % 60)
+      return { windowState: 'open' as const, timeRemaining: { days, hours, minutes } }
     }
     if (now < GROUP_STAGE_END) {
       return { windowState: 'locked' as const, timeRemaining: null }
@@ -212,7 +213,9 @@ function EspecialesContent() {
             <div className="flex items-center gap-3">
               <Clock size={18} strokeWidth={2} style={{ color: BAIN.red }} />
               <div>
-                <p className="text-sm font-bold" style={{ color: BAIN.black }}>Faltan {timeRemaining!.days} días y {timeRemaining!.hours} horas</p>
+                <p className="text-sm font-bold" style={{ color: BAIN.black }}>
+                  {timeRemaining!.days > 0 ? `${timeRemaining!.days}d ` : ''}{timeRemaining!.hours}h {timeRemaining!.minutes}min para el inicio
+                </p>
                 <p className="text-xs" style={{ color: BAIN.graySecondary }}>para que se cierren estas predicciones (11 jun · 00:00 ARG)</p>
               </div>
             </div>

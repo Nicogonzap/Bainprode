@@ -1,4 +1,4 @@
-﻿'use client'
+'use client'
 
 import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
@@ -161,7 +161,11 @@ function TorneoCardView({ card, userId, onLeave, onDelete }: {
           {card.descripcion && <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>{card.descripcion}</p>}
         </div>
         <div className="flex items-center gap-2 flex-shrink-0">
-          {!isGeneral && (
+          {isGeneral ? (
+            <Link href="/tabla" className="text-xs font-medium underline" style={{ color: BAIN.red }}>
+              Ver ranking
+            </Link>
+          ) : (
             <Link href={`/torneo/${card.id}`} className="text-xs font-medium underline" style={{ color: BAIN.red }}>
               Ver ranking
             </Link>

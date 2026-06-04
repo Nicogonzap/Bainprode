@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff, Lock } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff, Lock, BarChart2, AlertTriangle } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -24,8 +24,9 @@ const DAYS_ES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES'
 const MONTHS_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
-type ViewMode = 'fecha' | 'grupo'
+type ViewMode = 'fecha' | 'grupo' | 'resultados'
 type Predictions = Record<string, { home: number | ''; away: number | '' }>
+type PredPoints = Record<string, number | null>
 
 type ApiEquipo = { id: string; nombre_pais: string; codigo_iso: string; bandera_url: string | null }
 type ApiPartido = {
@@ -38,7 +39,7 @@ type DisplayMatch = {
   id: string; group: string
   home: string; homeUrl: string | null; homeName: string; homeId: string
   away: string; awayUrl: string | null; awayName: string; awayId: string
-  dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string; fecha_hora: string
+  dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string; fecha_hora: string; golesLocal: number | null; golesVisitante: number | null
 }
 type StandingRow = {
   id: string; name: string; code: string; url: string | null
@@ -67,6 +68,8 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
     venue: [p.estadio, p.ciudad].filter(Boolean).join(', '),
     estado: p.estado,
     fecha_hora: p.fecha_hora,
+    golesLocal: p.goles_local,
+    golesVisitante: p.goles_visitante,
   }
 }
 
@@ -99,6 +102,9 @@ function PrediccionesContent() {
   const [loading, setLoading] = useState(true)
   const [predictions, setPredictions] = useState<Predictions>({})
   const [saving, setSaving] = useState(false)
+  const [allMatches, setAllMatches] = useState<DisplayMatch[]>([])
+  const [allMatchesLoading, setAllMatchesLoading] = useState(false)
+  const [predPoints, setPredPoints] = useState<PredPoints>({})
 
   useEffect(() => {
     fetch('/api/partidos?fase=grupos')
@@ -114,8 +120,13 @@ function PrediccionesContent() {
       .then(({ data }) => {
         if (!data) return
         const mapped: Predictions = {}
-        for (const p of data) mapped[p.partido_id] = { home: p.goles_local, away: p.goles_visitante }
+        const pts: PredPoints = {}
+        for (const p of data) {
+          mapped[p.partido_id] = { home: p.goles_local, away: p.goles_visitante }
+          pts[p.partido_id] = p.puntos_obtenidos ?? null
+        }
         setPredictions(mapped)
+        setPredPoints(pts)
       })
       .catch(() => {})
   }, [user])
@@ -175,6 +186,16 @@ function PrediccionesContent() {
     }
   }, [user, predictions, toast])
 
+  useEffect(() => {
+    if (viewMode !== 'resultados' || allMatches.length > 0) return
+    setAllMatchesLoading(true)
+    fetch('/api/partidos')
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setAllMatches((data as ApiPartido[]).map(toDisplayMatch)) })
+      .catch(() => {})
+      .finally(() => setAllMatchesLoading(false))
+  }, [viewMode, allMatches.length])
+
   const dayGroups = useMemo(() => {
     const map = new Map<string, DisplayMatch[]>()
     for (const m of matches) {
@@ -207,6 +228,7 @@ function PrediccionesContent() {
           <nav className="flex items-center gap-1" role="tablist">
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
+            <ViewTab icon={<BarChart2 size={14} strokeWidth={2} />} label="Mis resultados" active={viewMode === 'resultados'} onClick={() => setViewMode('resultados')} />
           </nav>
           <button
             type="button"
@@ -263,6 +285,13 @@ function PrediccionesContent() {
               />
             ))}
           </>
+        ) : viewMode === 'resultados' ? (
+          <ResultsView
+            allMatches={allMatches}
+            loading={allMatchesLoading}
+            predictions={predictions}
+            predPoints={predPoints}
+          />
         ) : (
           <>
             {dayGroups.map((day, dayIdx) => (
@@ -394,8 +423,11 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
   showGroup?: boolean; compact?: boolean
 }) {
   const hasPrediction = prediction.home !== '' && prediction.away !== ''
-  const cutoffTime = new Date(new Date(match.fecha_hora).getTime() - 5 * 60 * 1000)
-  const isMatchLocked = new Date() >= cutoffTime || match.estado === 'finalizado' || match.estado === 'en_curso'
+  const now = new Date()
+  const cutoffTime = new Date(new Date(match.fecha_hora).getTime() - 60 * 60 * 1000)
+  const isMatchLocked = now >= cutoffTime || match.estado === 'finalizado' || match.estado === 'en_curso'
+  const minutesUntilCutoff = Math.round((cutoffTime.getTime() - now.getTime()) / 1000 / 60)
+  const isClosingSoon = !isMatchLocked && minutesUntilCutoff >= 0 && minutesUntilCutoff <= 60
   return (
     <div className="rounded-md transition-all" style={{ backgroundColor: BAIN.white, border: `1px solid ${hasPrediction ? BAIN.success + '50' : BAIN.grayBorder}`, padding: compact ? '12px 14px' : '20px' }}>
       <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
@@ -405,7 +437,11 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
           </span>
           {isMatchLocked ? (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${BAIN.graySecondary}15`, color: BAIN.graySecondary }}>
-              <Lock size={9} strokeWidth={2.5} />Cerrada
+              <Lock size={9} strokeWidth={2.5} />Cerrado
+            </span>
+          ) : isClosingSoon ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: '#FFF8E1', color: '#B7791F', border: '1px solid #F6E05E' }}>
+              <AlertTriangle size={9} strokeWidth={2.5} />Cierra en {minutesUntilCutoff}min
             </span>
           ) : hasPrediction ? (
             <span className="inline-flex items-center justify-center w-4 h-4 rounded-full" style={{ backgroundColor: BAIN.success }}>
@@ -437,6 +473,106 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
   )
 }
 
+
+function ResultCard({ match, prediction, points }: {
+  match: DisplayMatch
+  prediction: { home: number | ''; away: number | '' } | undefined
+  points: number | null | undefined
+}) {
+  const hasScore = match.golesLocal !== null && match.golesVisitante !== null
+  const hasPred = prediction && prediction.home !== '' && prediction.away !== ''
+  const isExact = hasPred && hasScore &&
+    Number(prediction.home) === match.golesLocal &&
+    Number(prediction.away) === match.golesVisitante
+
+  return (
+    <div className="rounded-md px-5 py-4 flex items-center justify-between gap-4"
+      style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+      {/* Teams + real score */}
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size="sm" />
+        <span className="text-sm font-bold hidden sm:inline" style={{ color: BAIN.black }}>{match.homeName}</span>
+        <span className="text-sm font-bold px-2" style={{ color: BAIN.black }}>
+          {hasScore ? `${match.golesLocal} – ${match.golesVisitante}` : '– vs –'}
+        </span>
+        <span className="text-sm font-bold hidden sm:inline" style={{ color: BAIN.black }}>{match.awayName}</span>
+        <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size="sm" />
+      </div>
+
+      {/* Prediction */}
+      <div className="flex flex-col items-end gap-0.5 flex-shrink-0 text-right">
+        {hasPred ? (
+          <span className="text-xs font-bold" style={{ color: isExact ? '#0F7B3E' : BAIN.graySecondary }}>
+            Pred: {prediction.home}–{prediction.away}
+          </span>
+        ) : (
+          <span className="text-xs font-bold" style={{ color: BAIN.red }}>Sin predicción</span>
+        )}
+        {points !== null && points !== undefined ? (
+          <span className="text-xs font-bold" style={{ color: points > 0 ? '#0F7B3E' : BAIN.graySecondary }}>
+            {points > 0 ? `+${points} pts` : '0 pts'}
+          </span>
+        ) : hasPred ? (
+          <span className="text-xs" style={{ color: BAIN.grayTertiary }}>Pendiente</span>
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+function ResultsView({ allMatches, loading, predictions, predPoints }: {
+  allMatches: DisplayMatch[]
+  loading: boolean
+  predictions: Predictions
+  predPoints: PredPoints
+}) {
+  const finishedMatches = allMatches
+    .filter(m => m.estado === 'finalizado')
+    .sort((a, b) => new Date(b.fecha_hora).getTime() - new Date(a.fecha_hora).getTime())
+
+  const totalPoints = Object.values(predPoints).reduce((s: number, v) => s + (v ?? 0), 0)
+  const acertados = Object.values(predPoints).filter(v => (v ?? 0) > 0).length
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-20">
+        <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
+      </div>
+    )
+  }
+
+  if (finishedMatches.length === 0) {
+    return (
+      <div className="rounded-md p-10 text-center" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+        <p className="text-sm" style={{ color: BAIN.graySecondary }}>Aún no hay partidos finalizados.</p>
+      </div>
+    )
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* Summary row */}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="rounded-md px-5 py-4" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+          <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PUNTOS TOTALES</p>
+          <p className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>{totalPoints}</p>
+        </div>
+        <div className="rounded-md px-5 py-4" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+          <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS ACERTADOS</p>
+          <p className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>{acertados} <span className="text-sm font-normal" style={{ color: BAIN.graySecondary }}>/ {finishedMatches.length}</span></p>
+        </div>
+      </div>
+      {finishedMatches.map(m => (
+        <ResultCard
+          key={m.id}
+          match={m}
+          prediction={predictions[m.id]}
+          points={predPoints[m.id]}
+        />
+      ))}
+    </div>
+  )
+}
 export default function PrediccionesPage() {
   return (
     <ToastProvider>

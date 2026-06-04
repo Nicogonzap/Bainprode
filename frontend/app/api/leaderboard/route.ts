@@ -1,4 +1,4 @@
-﻿import { NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 function getServerClient() {
@@ -15,6 +15,8 @@ export async function GET(request: Request) {
 
   try {
     const supabase = getServerClient()
+
+    // Fetch leaderboard rows
     let query = supabase
       .from('leaderboard')
       .select('*')
@@ -22,9 +24,30 @@ export async function GET(request: Request) {
 
     if (grupoId) query = query.eq('grupo_id', grupoId)
 
-    const { data, error } = await query
+    const { data: lbData, error } = await query
     if (error) throw error
-    return NextResponse.json({ data: data ?? [] })
+
+    if (!lbData || lbData.length === 0) return NextResponse.json({ data: [] })
+
+    // Enrich with oficina and tenure from usuarios table
+    const userIds = lbData.map((r: any) => r.usuario_id).filter(Boolean)
+    const { data: usuariosData } = await supabase
+      .from('usuarios')
+      .select('id, oficina, tenure')
+      .in('id', userIds)
+
+    const usuariosMap: Record<string, { oficina: string | null; tenure: string | null }> = {}
+    for (const u of usuariosData ?? []) {
+      usuariosMap[u.id] = { oficina: u.oficina ?? null, tenure: u.tenure ?? null }
+    }
+
+    const enriched = lbData.map((r: any) => ({
+      ...r,
+      oficina: usuariosMap[r.usuario_id]?.oficina ?? null,
+      tenure: usuariosMap[r.usuario_id]?.tenure ?? null,
+    }))
+
+    return NextResponse.json({ data: enriched })
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 })
   }
