@@ -10,6 +10,7 @@ import { ToastProvider, useToast } from '@/components/toast'
 import { useAuth } from '@/lib/auth-context'
 import { supabase } from '@/lib/supabase'
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
+import { LiveCard } from '@/components/live-card'
 
 const BAIN = {
   red: '#CC0000',
@@ -385,6 +386,7 @@ function HomePageContent() {
       )}
 
       <main className="flex-1">
+        <div className="max-w-[1200px] mx-auto px-4 sm:px-6 pt-6"><LiveCard /></div>
         {/* Hero — black */}
         <div style={{ backgroundColor: '#000000' }} className="relative overflow-hidden">
           <div className="max-w-[1200px] mx-auto px-6 py-10 relative">
