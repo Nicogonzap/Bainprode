@@ -43,7 +43,7 @@ function LabeledField({ label, children }: { label: string; children: React.Reac
 
 export default function PerfilPage() {
   const router = useRouter()
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
   const [form, setForm] = useState<FormState>({ nombre: '', apellido: '', tenure: '', oficina: '' })
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -201,6 +201,14 @@ export default function PerfilPage() {
                 style={{ backgroundColor: BAIN.grayBg, border: `1px solid ${BAIN.grayBorder}`, color: BAIN.black }}
               >
                 Cancelar
+              </button>
+              <button
+                type="button"
+                onClick={signOut}
+                className="ml-auto px-4 py-2.5 rounded-md text-sm font-medium"
+                style={{ color: BAIN.red }}
+              >
+                Cerrar sesión
               </button>
             </div>
           </form>

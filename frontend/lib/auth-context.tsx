@@ -30,7 +30,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => {
-      setUser(data.session?.user ?? null)
+      const noRemember = typeof localStorage !== 'undefined' && localStorage.getItem('prode_no_remember') === '1'
+      const activeSession = typeof sessionStorage !== 'undefined' && sessionStorage.getItem('prode_active') === '1'
+      if (data.session && noRemember && !activeSession) {
+        supabase.auth.signOut()
+        setUser(null)
+      } else {
+        if (data.session && typeof sessionStorage !== 'undefined') sessionStorage.setItem('prode_active', '1')
+        setUser(data.session?.user ?? null)
+      }
       setLoading(false)
     })
 
@@ -42,6 +50,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const signOut = async () => {
+    if (typeof localStorage !== 'undefined') localStorage.removeItem('prode_no_remember')
+    if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem('prode_active')
     await supabase.auth.signOut()
     router.push('/')
   }

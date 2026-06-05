@@ -91,35 +91,42 @@ export default function RegistroPage() {
     setErrors({})
 
     try {
-      const { data, error } = await supabase.auth.signUp({
+      // Registro server-side: evita rate limit de emails y no requiere confirmación
+      const res = await fetch('/api/auth/registro', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: form.email,
+          password: form.password,
+          nombre: form.nombre,
+          apellido: form.apellido,
+          tenure: form.tenure,
+          oficina: form.oficina,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) throw new Error(json.error || 'Error al registrar')
+
+      // Iniciar sesión automáticamente
+      const { error: signInError } = await supabase.auth.signInWithPassword({
         email: form.email,
         password: form.password,
-        options: {
-          data: {
-            nombre: form.nombre.trim(),
-            apellido: form.apellido.trim(),
-            tenure: form.tenure,
-            oficina: form.oficina,
-            nombre_usuario: `${form.nombre.trim()} ${form.apellido.trim()}`,
-          },
-        },
       })
+      if (signInError) throw signInError
 
-      if (error) throw error
-
-      // Unirse automáticamente a torneos por oficina y tenure (fire-and-forget)
-      const userId = data?.user?.id
-      if (userId) {
+      // Unirse a torneos por oficina y tenure (fire-and-forget)
+      if (json.user_id) {
         fetch('/api/torneos/join-oficina', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ usuario_id: userId, oficina: form.oficina, tenure: form.tenure }),
+          body: JSON.stringify({ usuario_id: json.user_id, oficina: form.oficina, tenure: form.tenure }),
         }).catch(() => {})
       }
 
       router.push('/home')
-    } catch (err: any) {
-      setErrors({ general: err.message || 'Error al registrar. Intentá nuevamente.' })
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Error al registrar. Intentá nuevamente.'
+      setErrors({ general: msg })
     } finally {
       setLoading(false)
     }

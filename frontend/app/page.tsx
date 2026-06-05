@@ -11,6 +11,7 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
+  const [rememberMe, setRememberMe] = useState(true)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -24,6 +25,12 @@ export default function LoginPage() {
     try {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password })
       if (authError) throw authError
+      if (rememberMe) {
+        localStorage.removeItem('prode_no_remember')
+      } else {
+        localStorage.setItem('prode_no_remember', '1')
+        sessionStorage.setItem('prode_active', '1')
+      }
       router.push('/home')
     } catch (err: any) {
       setError(
@@ -136,6 +143,16 @@ export default function LoginPage() {
             </div>
 
             {error && <p className="text-xs" style={{ color: '#CC0000' }}>{error}</p>}
+
+            <label className="flex items-center gap-2.5 cursor-pointer select-none">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(e) => setRememberMe(e.target.checked)}
+                className="w-4 h-4 rounded accent-red-600 cursor-pointer"
+              />
+              <span className="text-sm" style={{ color: '#888888' }}>Recordarme</span>
+            </label>
 
             <button
               type="submit"

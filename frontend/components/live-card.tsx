@@ -76,11 +76,18 @@ function LiveBadge() {
 }
 
 function UpcomingBadge({ fecha }: { fecha: string }) {
-  const mins = Math.round((new Date(fecha).getTime() - Date.now()) / 60000)
+  const d = new Date(fecha)
+  const mins = Math.round((d.getTime() - Date.now()) / 60000)
+  const weekdays = ['dom', 'lun', 'mar', 'mié', 'jue', 'vie', 'sáb']
+  const months = ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic']
+  const dayLabel = `${weekdays[d.getDay()]}, ${d.getDate()} ${months[d.getMonth()]}`
   return (
-    <div className="flex items-center gap-1.5">
+    <div className="flex flex-col items-end gap-0.5">
       <span className="text-xs font-medium" style={{ color: BAIN.graySecondary }}>
         {mins <= 0 ? 'Comenzando…' : `En ${mins} min`}
+      </span>
+      <span className="text-[10px]" style={{ color: BAIN.grayTertiary }}>
+        {dayLabel}
       </span>
     </div>
   )

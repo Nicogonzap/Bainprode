@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Menu, X, User } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
@@ -61,7 +61,20 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
   const pathname = usePathname() || ''
   const active = activePage ?? detectActive(pathname)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const { user } = useAuth()
+  const { user, signOut } = useAuth()
+  const [profileOpen, setProfileOpen] = useState(false)
+  const profileRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!profileOpen) return
+    const handler = (e: MouseEvent) => {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [profileOpen])
   const isAdmin = user?.email === ADMIN_EMAIL
   const effectiveLinks = isAdmin
     ? [...NAV_LINKS, { href: '/admin', label: 'Test', key: 'admin' as ActivePage }]
@@ -101,14 +114,40 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
 
         {/* Right: user icon + hamburger */}
         <div className="flex items-center gap-3">
-          <Link
-            href="/perfil"
-            className="hidden md:flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-70"
-            style={{ backgroundColor: '#1a1a1a', color: '#999999' }}
-            aria-label="Mi perfil"
-          >
-            <User size={15} />
-          </Link>
+          <div ref={profileRef} className="relative hidden md:block">
+            <button
+              type="button"
+              onClick={() => setProfileOpen((s) => !s)}
+              className="flex items-center justify-center w-8 h-8 rounded-full transition-opacity hover:opacity-70"
+              style={{ backgroundColor: profileOpen ? '#2a2a2a' : '#1a1a1a', color: '#999999' }}
+              aria-label="Mi cuenta"
+            >
+              <User size={15} />
+            </button>
+            {profileOpen && (
+              <div
+                className="absolute right-0 top-11 w-44 rounded-md overflow-hidden z-50 shadow-xl"
+                style={{ backgroundColor: '#111111', border: '1px solid #2a2a2a' }}
+              >
+                <Link
+                  href="/perfil"
+                  onClick={() => setProfileOpen(false)}
+                  className="flex items-center px-4 py-3 text-sm transition-colors hover:bg-white/5"
+                  style={{ color: '#CCCCCC' }}
+                >
+                  Mi perfil
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => { setProfileOpen(false); signOut() }}
+                  className="w-full flex items-center px-4 py-3 text-sm transition-colors hover:bg-white/5 text-left"
+                  style={{ color: '#CC0000', borderTop: '1px solid #1f1f1f' }}
+                >
+                  Cerrar sesión
+                </button>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             className="md:hidden flex items-center justify-center w-9 h-9 rounded-md"
@@ -154,6 +193,14 @@ export function TopNav({ activePage }: { activePage?: ActivePage }) {
             >
               Mi perfil
             </Link>
+            <button
+              type="button"
+              onClick={() => { setMobileOpen(false); signOut() }}
+              className="text-sm font-medium py-3 pl-3 transition-opacity hover:opacity-70 text-left"
+              style={{ color: '#CC0000', borderLeft: '3px solid transparent' }}
+            >
+              Cerrar sesión
+            </button>
           </nav>
         </div>
       )}
