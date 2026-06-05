@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Save, Trash2, Calendar, Grid3x3 } from 'lucide-react'
+import { Save, Trash2, Calendar, Grid3x3, Users, AlertTriangle } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -143,6 +143,123 @@ function MatchResultRow({ match, result, onUpdate, onSave, onClear, saving }: {
   )
 }
 
+
+type AdminUser = {
+  id: string; nombre: string | null; apellido: string | null
+  nombre_usuario: string | null; email: string | null
+  tenure: string | null; oficina: string | null; created_at: string
+}
+
+function UsersView({ getToken, toast }: {
+  getToken: () => Promise<string | null>
+  toast: (opts: { message: string; type: 'success' | 'error'; duration?: number }) => void
+}) {
+  const [users, setUsers] = useState<AdminUser[]>([])
+  const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState<string | null>(null)
+  const [confirmId, setConfirmId] = useState<string | null>(null)
+
+  const loadUsers = async () => {
+    setLoading(true)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/usuarios', { headers: { Authorization: `Bearer ${token}` } })
+      const json = await res.json()
+      setUsers(json.data ?? [])
+    } catch { /* ignore */ }
+    finally { setLoading(false) }
+  }
+
+  useEffect(() => { loadUsers() }, [])
+
+  const handleDelete = async (userId: string) => {
+    setDeleting(userId)
+    setConfirmId(null)
+    try {
+      const token = await getToken()
+      const res = await fetch('/api/admin/usuarios', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ usuario_id: userId }),
+      })
+      if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Error') }
+      setUsers(prev => prev.filter(u => u.id !== userId))
+      toast({ message: 'Usuario eliminado', type: 'success', duration: 2000 })
+    } catch (e: any) {
+      toast({ message: e.message || 'Error al eliminar', type: 'error', duration: 3000 })
+    } finally {
+      setDeleting(null)
+    }
+  }
+
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
+    </div>
+  )
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-6">
+        <h1 className="text-3xl font-bold tracking-tight" style={{ color: BAIN.black }}>Usuarios</h1>
+        <span className="text-xs px-2 py-1 rounded font-medium" style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary, border: `1px solid ${BAIN.grayBorder}` }}>
+          {users.length} registrados
+        </span>
+      </div>
+      <div className="flex flex-col gap-2">
+        {users.map(u => (
+          <div key={u.id} className="rounded-md px-4 py-3 flex flex-wrap items-center gap-3"
+            style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+            <div className="flex-1 min-w-0">
+              <p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>
+                {u.nombre && u.apellido ? `${u.nombre} ${u.apellido}` : u.nombre_usuario ?? '—'}
+              </p>
+              <p className="text-xs truncate" style={{ color: BAIN.graySecondary }}>{u.email ?? '—'}</p>
+            </div>
+            <div className="flex items-center gap-3 flex-shrink-0">
+              {u.tenure && (
+                <span className="text-[10px] font-bold px-1.5 py-0.5 rounded"
+                  style={{ backgroundColor: `${BAIN.red}15`, color: BAIN.red }}>{u.tenure}</span>
+              )}
+              {u.oficina && (
+                <span className="text-xs" style={{ color: BAIN.grayTertiary }}>{u.oficina}</span>
+              )}
+              <span className="text-[10px]" style={{ color: BAIN.grayTertiary }}>
+                {new Date(u.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
+              </span>
+              {confirmId === u.id ? (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs" style={{ color: BAIN.amber }}>¿Confirmar baja?</span>
+                  <button type="button" onClick={() => handleDelete(u.id)} disabled={deleting === u.id}
+                    className="px-2 py-1 rounded text-xs font-bold"
+                    style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
+                    {deleting === u.id ? '…' : 'Sí, dar de baja'}
+                  </button>
+                  <button type="button" onClick={() => setConfirmId(null)}
+                    className="px-2 py-1 rounded text-xs font-medium"
+                    style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary, border: `1px solid ${BAIN.grayBorder}` }}>
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button type="button" onClick={() => setConfirmId(u.id)}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-red-50"
+                  style={{ color: BAIN.red, border: `1px solid ${BAIN.red}40` }}>
+                  <Trash2 size={12} strokeWidth={2} />
+                  Dar de baja
+                </button>
+              )}
+            </div>
+          </div>
+        ))}
+        {users.length === 0 && (
+          <p className="text-sm text-center py-10" style={{ color: BAIN.graySecondary }}>No hay usuarios registrados.</p>
+        )}
+      </div>
+    </section>
+  )
+}
+
 function AdminContent() {
   const { toast } = useToast()
   const { user, loading: authLoading } = useAuth()
@@ -151,7 +268,7 @@ function AdminContent() {
   const [loading, setLoading] = useState(true)
   const [results, setResults] = useState<Results>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [viewMode, setViewMode] = useState<'fecha' | 'grupo'>('fecha')
+  const [viewMode, setViewMode] = useState<'fecha' | 'grupo' | 'usuarios'>('fecha')
 
   useEffect(() => {
     if (authLoading) return
@@ -272,6 +389,7 @@ function AdminContent() {
           <nav className="flex items-center gap-1">
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
+            <ViewTab icon={<Users size={14} strokeWidth={2} />} label="Usuarios" active={viewMode === 'usuarios'} onClick={() => setViewMode('usuarios')} />
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-xs" style={{ color: BAIN.graySecondary }}>{finalizadoCount} / {partidos.length} finalizados</span>
@@ -322,6 +440,8 @@ function AdminContent() {
               </div>
             </section>
           ))
+        ) : (
+          <UsersView getToken={getToken} toast={toast} />
         )}
       </main>
       <Footer />
