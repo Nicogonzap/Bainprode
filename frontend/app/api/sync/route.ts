@@ -88,6 +88,10 @@ export async function GET(request: Request) {
       const nuevoVisitante = fixture.goals.away
       const nuevoMinuto = fixture.fixture.status.elapsed ?? null
 
+      // Don't overwrite admin-entered results when API still says "programado" (future match).
+      // Only sync when API has real data: en_juego, finalizado, or suspendido.
+      if (nuevoEstado === 'programado') continue
+
       const cambioEstado = partido.estado !== nuevoEstado
       const cambioScore =
         partido.goles_local !== nuevoLocal || partido.goles_visitante !== nuevoVisitante

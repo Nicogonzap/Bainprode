@@ -32,8 +32,27 @@ export async function PATCH(request: Request) {
     if (goles_visitante !== undefined) update.goles_visitante = goles_visitante
     if (estado !== undefined) update.estado = estado
 
+    const { data: partidoActual } = await supabase
+      .from('partidos')
+      .select('estado')
+      .eq('id', partido_id)
+      .single()
+
     const { error } = await supabase.from('partidos').update(update).eq('id', partido_id)
     if (error) throw error
+
+    // Trigger point calculation when match is newly finalized with scores
+    const recienFinalizado =
+      estado === 'finalizado' &&
+      partidoActual?.estado !== 'finalizado' &&
+      update.goles_local !== null &&
+      update.goles_local !== undefined &&
+      update.goles_visitante !== null &&
+      update.goles_visitante !== undefined
+
+    if (recienFinalizado) {
+      await supabase.rpc('calcular_puntos_prediccion', { p_partido_id: partido_id })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (err: any) {
