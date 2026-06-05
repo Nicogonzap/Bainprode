@@ -424,7 +424,7 @@ function AdminContent() {
               </div>
             </section>
           ))
-        ) : (
+        ) : viewMode === 'grupo' ? (
           groupSections.map((g, idx) => (
             <section key={g.group} className="mb-6 animate-in fade-in slide-in-from-bottom-2"
               style={{ animationDelay: `${idx * 30}ms`, animationFillMode: 'backwards', animationDuration: '350ms' }}>
