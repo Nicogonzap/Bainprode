@@ -31,8 +31,9 @@ type PlayerTeam = { player: string; team: string }
 
 type Specials = {
   champion: string
+  subcampeon: string
+  tercerPuesto: string
   topScorer: PlayerTeam
-  topAssister: PlayerTeam
   ballonDOr: PlayerTeam
   goldenGlove: PlayerTeam
 }
@@ -40,8 +41,9 @@ type Specials = {
 const EMPTY_PT: PlayerTeam = { player: '', team: '' }
 const INITIAL: Specials = {
   champion: '',
+  subcampeon: '',
+  tercerPuesto: '',
   topScorer: { ...EMPTY_PT },
-  topAssister: { ...EMPTY_PT },
   ballonDOr: { ...EMPTY_PT },
   goldenGlove: { ...EMPTY_PT },
 }
@@ -94,8 +96,9 @@ function EspecialesContent() {
         if (data) {
           setSpecials({
             champion: data.campeon ?? '',
+            subcampeon: data.subcampeon ?? '',
+            tercerPuesto: data.tercer_puesto ?? '',
             topScorer: { player: data.goleador_nombre ?? '', team: data.goleador_equipo ?? '' },
-            topAssister: { player: data.asistente_nombre ?? '', team: data.asistente_equipo ?? '' },
             ballonDOr: { player: data.balon_de_oro_nombre ?? '', team: data.balon_de_oro_equipo ?? '' },
             goldenGlove: { player: data.guante_de_oro_nombre ?? '', team: data.guante_de_oro_equipo ?? '' },
           })
@@ -127,8 +130,9 @@ function EspecialesContent() {
   const completedCount = useMemo(() => {
     let n = 0
     if (specials.champion) n++
+    if (specials.subcampeon) n++
+    if (specials.tercerPuesto) n++
     if (specials.topScorer.player && specials.topScorer.team) n++
-    if (specials.topAssister.player && specials.topAssister.team) n++
     if (specials.ballonDOr.player && specials.ballonDOr.team) n++
     if (specials.goldenGlove.player && specials.goldenGlove.team) n++
     return n
@@ -144,10 +148,10 @@ function EspecialesContent() {
         body: JSON.stringify({
           usuario_id: user.id,
           campeon: specials.champion || null,
+          subcampeon: specials.subcampeon || null,
+          tercer_puesto: specials.tercerPuesto || null,
           goleador_nombre: specials.topScorer.player || null,
           goleador_equipo: specials.topScorer.team || null,
-          asistente_nombre: specials.topAssister.player || null,
-          asistente_equipo: specials.topAssister.team || null,
           balon_de_oro_nombre: specials.ballonDOr.player || null,
           balon_de_oro_equipo: specials.ballonDOr.team || null,
           guante_de_oro_nombre: specials.goldenGlove.player || null,
@@ -205,7 +209,7 @@ function EspecialesContent() {
             </div>
             <div className="hidden sm:block text-right">
               <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>COMPLETADAS</p>
-              <p className="text-lg font-bold" style={{ color: BAIN.black }}><span style={{ color: BAIN.amber }}>{completedCount}</span><span style={{ color: BAIN.grayTertiary }}> / 5</span></p>
+              <p className="text-lg font-bold" style={{ color: BAIN.black }}><span style={{ color: BAIN.amber }}>{completedCount}</span><span style={{ color: BAIN.grayTertiary }}> / 6</span></p>
             </div>
           </section>
         ) : (
@@ -221,7 +225,7 @@ function EspecialesContent() {
             </div>
             <div className="hidden sm:block text-right">
               <p className="text-xs font-medium uppercase mb-1" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>COMPLETADAS</p>
-              <p className="text-lg font-bold" style={{ color: BAIN.black }}><span style={{ color: BAIN.red }}>{completedCount}</span><span style={{ color: BAIN.grayTertiary }}> / 5</span></p>
+              <p className="text-lg font-bold" style={{ color: BAIN.black }}><span style={{ color: BAIN.red }}>{completedCount}</span><span style={{ color: BAIN.grayTertiary }}> / 6</span></p>
             </div>
           </section>
         )}
@@ -231,23 +235,27 @@ function EspecialesContent() {
         ) : (
           <div className="flex flex-col gap-4">
 
-            <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={50} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.champion}>
+            <PredictionCard icon={<Trophy size={20} strokeWidth={1.75} />} title="Campeón del Mundial" subtitle="¿Quién levanta la copa el 19 de julio?" points={15} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.champion}>
               <TeamSelect value={specials.champion} onChange={(v) => setSpecials((s) => ({ ...s, champion: v }))} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles convertidos" points={30} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
+            <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Subcampeón del Mundial" subtitle="¿Quién pierde la final?" points={8} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.subcampeon}>
+              <TeamSelect value={specials.subcampeon} onChange={(v) => setSpecials((s) => ({ ...s, subcampeon: v }))} disabled={isLocked} equipos={equipos} />
+            </PredictionCard>
+
+            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Tercer puesto" subtitle="¿Quién se queda con el bronce?" points={5} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.tercerPuesto}>
+              <TeamSelect value={specials.tercerPuesto} onChange={(v) => setSpecials((s) => ({ ...s, tercerPuesto: v }))} disabled={isLocked} equipos={equipos} />
+            </PredictionCard>
+
+            <PredictionCard icon={<Target size={20} strokeWidth={1.75} />} title="Goleador del torneo" subtitle="Jugador con más goles · Si hay empate todos aciertan" points={10} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.topScorer.player && !!specials.topScorer.team}>
               <PlayerTeamSelect team={specials.topScorer.team} player={specials.topScorer.player} onTeamChange={(v) => setTeamPlayer('topScorer', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topScorer', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Sparkles size={20} strokeWidth={1.75} />} title="Máximo asistente" subtitle="Jugador con más asistencias" points={20} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.topAssister.player && !!specials.topAssister.team}>
-              <PlayerTeamSelect team={specials.topAssister.team} player={specials.topAssister.player} onTeamChange={(v) => setTeamPlayer('topAssister', 'team', v)} onPlayerChange={(v) => setTeamPlayer('topAssister', 'player', v)} disabled={isLocked} equipos={equipos} />
-            </PredictionCard>
-
-            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Balón de Oro" subtitle="Mejor jugador del torneo" points={25} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.ballonDOr.player && !!specials.ballonDOr.team}>
+            <PredictionCard icon={<Star size={20} strokeWidth={1.75} />} title="Balón de Oro" subtitle="Mejor jugador del torneo" points={10} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.ballonDOr.player && !!specials.ballonDOr.team}>
               <PlayerTeamSelect team={specials.ballonDOr.team} player={specials.ballonDOr.player} onTeamChange={(v) => setTeamPlayer('ballonDOr', 'team', v)} onPlayerChange={(v) => setTeamPlayer('ballonDOr', 'player', v)} disabled={isLocked} equipos={equipos} />
             </PredictionCard>
 
-            <PredictionCard icon={<Shield size={20} strokeWidth={1.75} />} title="Guante de Oro" subtitle="Mejor arquero del torneo" points={20} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.goldenGlove.player && !!specials.goldenGlove.team}>
+            <PredictionCard icon={<Shield size={20} strokeWidth={1.75} />} title="Guante de Oro" subtitle="Mejor arquero del torneo" points={10} isLocked={isLocked} secondWindow={isSecondWindow} isFilled={!!specials.goldenGlove.player && !!specials.goldenGlove.team}>
               <PlayerTeamSelect team={specials.goldenGlove.team} player={specials.goldenGlove.player} onTeamChange={(v) => setTeamPlayer('goldenGlove', 'team', v)} onPlayerChange={(v) => setTeamPlayer('goldenGlove', 'player', v)} disabled={isLocked} equipos={equipos} posicion="ARQ" />
             </PredictionCard>
 
@@ -271,11 +279,12 @@ function EspecialesContent() {
             </p>
           )}
           <ul className="space-y-2">
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Trophy size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Campeón del Mundial</span><span className="font-bold">50 pts</span></li>
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Target size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Goleador del torneo</span><span className="font-bold">30 pts</span></li>
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Sparkles size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Máximo asistente</span><span className="font-bold">20 pts</span></li>
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Star size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Balón de Oro</span><span className="font-bold">25 pts</span></li>
-            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Shield size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Guante de Oro</span><span className="font-bold">20 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Trophy size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Campeón del Mundial</span><span className="font-bold">15 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Sparkles size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Subcampeón</span><span className="font-bold">8 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Star size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Tercer puesto</span><span className="font-bold">5 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Target size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Goleador del torneo <span style={{ color: BAIN.grayTertiary, fontSize: '11px' }}>(empate: todos aciertan)</span></span><span className="font-bold">10 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Star size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Balón de Oro</span><span className="font-bold">10 pts</span></li>
+            <li className="flex items-center gap-3 text-sm" style={{ color: BAIN.black }}><Shield size={14} strokeWidth={2} style={{ color: BAIN.red }} /><span className="flex-1">Guante de Oro</span><span className="font-bold">10 pts</span></li>
           </ul>
         </section>
       </main>
