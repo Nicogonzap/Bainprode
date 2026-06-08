@@ -17,7 +17,7 @@ const BAIN = {
 
 const BAIN_LOGO_FULL = '/favicon.png'
 
-type Tenure = 'AC' | 'SAC' | 'C' | 'M' | 'SM' | 'AP' | 'P'
+type Tenure = 'AC' | 'SAC' | 'C' | 'M' | 'SM' | 'AP' | 'P' | 'LBF'
 type Oficina = 'Buenos Aires' | 'Santiago' | 'Lima' | 'Bogotá' | 'São Paulo' | 'Ciudad de México' | 'Monterrey'
 
 const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
@@ -28,6 +28,7 @@ const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
   { value: 'SM', label: 'SM — Senior Manager' },
   { value: 'AP', label: 'AP — Associate Partner' },
   { value: 'P', label: 'P — Partner' },
+  { value: 'LBF', label: 'LBF — Local Business Finance' },
 ]
 
 const OFICINA_OPTIONS: Oficina[] = [

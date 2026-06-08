@@ -18,7 +18,7 @@ const BAIN = {
   grayTertiary: '#999999',
 } as const
 
-const TENURE_OPTIONS = ['AC', 'SAC', 'C', 'M', 'SM', 'AP', 'P'] as const
+const TENURE_OPTIONS = ['AC', 'SAC', 'C', 'M', 'SM', 'AP', 'P', 'LBF'] as const
 const OFICINA_OPTIONS = [
   'Buenos Aires', 'Santiago', 'Lima', 'Bogotá', 'São Paulo', 'Ciudad de México', 'Monterrey',
 ] as const
