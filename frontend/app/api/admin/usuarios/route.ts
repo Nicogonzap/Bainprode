@@ -26,32 +26,29 @@ export async function GET(req: NextRequest) {
   const supabase = getAdminClient()
   const { data, error } = await supabase
     .from('usuarios')
-    .select('id, nombre, apellido, nombre_usuario, email, tenure, oficina, created_at')
+    .select('id, nombre, apellido, nombre_usuario, email, tenure, oficina, activo, created_at')
+    .order('activo', { ascending: false })
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   return NextResponse.json({ data })
 }
 
-export async function DELETE(req: NextRequest) {
+export async function PATCH(req: NextRequest) {
   const admin = await verifyAdmin(req)
   if (!admin) return NextResponse.json({ error: 'No autorizado' }, { status: 403 })
 
-  const { usuario_id } = await req.json()
-  if (!usuario_id) return NextResponse.json({ error: 'usuario_id requerido' }, { status: 400 })
+  const { usuario_id, activo } = await req.json()
+  if (!usuario_id || typeof activo !== 'boolean') {
+    return NextResponse.json({ error: 'usuario_id y activo requeridos' }, { status: 400 })
+  }
 
   const supabase = getAdminClient()
+  const { error } = await supabase
+    .from('usuarios')
+    .update({ activo })
+    .eq('id', usuario_id)
 
-  // Delete all user data from public tables first (order matters for FK constraints)
-  await supabase.from('historial_puntos').delete().eq('usuario_id', usuario_id)
-  await supabase.from('predicciones').delete().eq('usuario_id', usuario_id)
-  await supabase.from('predicciones_especiales').delete().eq('usuario_id', usuario_id)
-  await supabase.from('torneo_miembros').delete().eq('usuario_id', usuario_id)
-  await supabase.from('usuarios').delete().eq('id', usuario_id)
-
-  // Delete from auth (removes login capability)
-  const { error } = await supabase.auth.admin.deleteUser(usuario_id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
   return NextResponse.json({ ok: true })
 }

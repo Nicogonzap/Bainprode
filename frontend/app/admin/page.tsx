@@ -147,7 +147,7 @@ function MatchResultRow({ match, result, onUpdate, onSave, onClear, saving }: {
 type AdminUser = {
   id: string; nombre: string | null; apellido: string | null
   nombre_usuario: string | null; email: string | null
-  tenure: string | null; oficina: string | null; created_at: string
+  tenure: string | null; oficina: string | null; activo: boolean; created_at: string
 }
 
 function UsersView({ getToken, toast }: {
@@ -172,21 +172,21 @@ function UsersView({ getToken, toast }: {
 
   useEffect(() => { loadUsers() }, [])
 
-  const handleDelete = async (userId: string) => {
+  const handleToggle = async (userId: string, nuevoActivo: boolean) => {
     setDeleting(userId)
     setConfirmId(null)
     try {
       const token = await getToken()
       const res = await fetch('/api/admin/usuarios', {
-        method: 'DELETE',
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ usuario_id: userId }),
+        body: JSON.stringify({ usuario_id: userId, activo: nuevoActivo }),
       })
       if (!res.ok) { const j = await res.json(); throw new Error(j.error || 'Error') }
-      setUsers(prev => prev.filter(u => u.id !== userId))
-      toast({ message: 'Usuario eliminado', type: 'success', duration: 2000 })
+      setUsers(prev => prev.map(u => u.id === userId ? { ...u, activo: nuevoActivo } : u))
+      toast({ message: nuevoActivo ? 'Usuario reactivado' : 'Usuario dado de baja', type: 'success', duration: 2000 })
     } catch (e: any) {
-      toast({ message: e.message || 'Error al eliminar', type: 'error', duration: 3000 })
+      toast({ message: e.message || 'Error', type: 'error', duration: 3000 })
     } finally {
       setDeleting(null)
     }
@@ -209,11 +209,17 @@ function UsersView({ getToken, toast }: {
       <div className="flex flex-col gap-2">
         {users.map(u => (
           <div key={u.id} className="rounded-md px-4 py-3 flex flex-wrap items-center gap-3"
-            style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+            style={{ backgroundColor: BAIN.white, border: `1px solid ${u.activo ? BAIN.grayBorder : BAIN.amber+'40'}`, opacity: u.activo ? 1 : 0.65 }}>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>
-                {u.nombre && u.apellido ? `${u.nombre} ${u.apellido}` : u.nombre_usuario ?? '—'}
-              </p>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-bold truncate" style={{ color: BAIN.black }}>
+                  {u.nombre && u.apellido ? `${u.nombre} ${u.apellido}` : u.nombre_usuario ?? '—'}
+                </p>
+                {!u.activo && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded flex-shrink-0"
+                    style={{ backgroundColor: `${BAIN.amber}20`, color: BAIN.amber }}>BAJA</span>
+                )}
+              </div>
               <p className="text-xs truncate" style={{ color: BAIN.graySecondary }}>{u.email ?? '—'}</p>
             </div>
             <div className="flex items-center gap-3 flex-shrink-0">
@@ -222,31 +228,39 @@ function UsersView({ getToken, toast }: {
                   style={{ backgroundColor: `${BAIN.red}15`, color: BAIN.red }}>{u.tenure}</span>
               )}
               {u.oficina && (
-                <span className="text-xs" style={{ color: BAIN.grayTertiary }}>{u.oficina}</span>
+                <span className="text-xs hidden sm:block" style={{ color: BAIN.grayTertiary }}>{u.oficina}</span>
               )}
               <span className="text-[10px]" style={{ color: BAIN.grayTertiary }}>
                 {new Date(u.created_at).toLocaleDateString('es-AR', { day: '2-digit', month: 'short', year: 'numeric' })}
               </span>
-              {confirmId === u.id ? (
-                <div className="flex items-center gap-1.5">
-                  <span className="text-xs" style={{ color: BAIN.amber }}>¿Confirmar baja?</span>
-                  <button type="button" onClick={() => handleDelete(u.id)} disabled={deleting === u.id}
-                    className="px-2 py-1 rounded text-xs font-bold"
-                    style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
-                    {deleting === u.id ? '…' : 'Sí, dar de baja'}
+              {u.activo ? (
+                confirmId === u.id ? (
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-xs" style={{ color: BAIN.amber }}>¿Confirmar baja?</span>
+                    <button type="button" onClick={() => handleToggle(u.id, false)} disabled={deleting === u.id}
+                      className="px-2 py-1 rounded text-xs font-bold"
+                      style={{ backgroundColor: BAIN.red, color: BAIN.white }}>
+                      {deleting === u.id ? '…' : 'Sí, dar de baja'}
+                    </button>
+                    <button type="button" onClick={() => setConfirmId(null)}
+                      className="px-2 py-1 rounded text-xs font-medium"
+                      style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary, border: `1px solid ${BAIN.grayBorder}` }}>
+                      Cancelar
+                    </button>
+                  </div>
+                ) : (
+                  <button type="button" onClick={() => setConfirmId(u.id)}
+                    className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-red-50"
+                    style={{ color: BAIN.red, border: `1px solid ${BAIN.red}40` }}>
+                    <Trash2 size={12} strokeWidth={2} />
+                    Dar de baja
                   </button>
-                  <button type="button" onClick={() => setConfirmId(null)}
-                    className="px-2 py-1 rounded text-xs font-medium"
-                    style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary, border: `1px solid ${BAIN.grayBorder}` }}>
-                    Cancelar
-                  </button>
-                </div>
+                )
               ) : (
-                <button type="button" onClick={() => setConfirmId(u.id)}
-                  className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors hover:bg-red-50"
-                  style={{ color: BAIN.red, border: `1px solid ${BAIN.red}40` }}>
-                  <Trash2 size={12} strokeWidth={2} />
-                  Dar de baja
+                <button type="button" onClick={() => handleToggle(u.id, true)} disabled={deleting === u.id}
+                  className="flex items-center gap-1 px-2 py-1.5 rounded-md text-xs font-medium transition-colors"
+                  style={{ color: BAIN.success, border: `1px solid ${BAIN.success}40` }}>
+                  {deleting === u.id ? '…' : 'Reactivar'}
                 </button>
               )}
             </div>

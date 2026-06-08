@@ -35,6 +35,7 @@ export async function GET(request: Request) {
       .from('usuarios')
       .select('id, oficina, tenure')
       .in('id', userIds)
+      .eq('activo', true)
 
     const usuariosMap: Record<string, { oficina: string | null; tenure: string | null }> = {}
     for (const u of usuariosData ?? []) {

@@ -30,7 +30,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
     if (memberIds.length > 0) {
       const [puntosRes, usuariosRes] = await Promise.all([
         supabase.from('historial_puntos').select('usuario_id, puntos').in('usuario_id', memberIds),
-        supabase.from('usuarios').select('id, nombre, apellido, nombre_usuario, tenure').in('id', memberIds),
+        supabase.from('usuarios').select('id, nombre, apellido, nombre_usuario, tenure').in('id', memberIds).eq('activo', true),
       ])
       puntosRes.data?.forEach((p: any) => {
         puntosMap[p.usuario_id] = (puntosMap[p.usuario_id] ?? 0) + p.puntos
