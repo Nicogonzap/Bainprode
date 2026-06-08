@@ -28,7 +28,7 @@ const TENURE_OPTIONS: { value: Tenure; label: string }[] = [
   { value: 'SM', label: 'SM — Senior Manager' },
   { value: 'AP', label: 'AP — Associate Partner' },
   { value: 'P', label: 'P — Partner' },
-  { value: 'LBF', label: 'LBF — Local Business Finance' },
+  { value: 'LBF', label: 'LBF — Local Business Function' },
 ]
 
 const OFICINA_OPTIONS: Oficina[] = [
