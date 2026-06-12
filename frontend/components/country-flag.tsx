@@ -22,8 +22,9 @@ const ISO3_TO_ISO2: Record<string, string> = {
   NZL: 'nz', FIJ: 'fj', PNG: 'pg', VAN: 'vu', SOL: 'sb',
 }
 
-function getISO2(code: string): string {
-  const upper = code.toUpperCase()
+function getISO2(code: string | null | undefined): string {
+  if (!code) return 'xx'
+  const upper = code.trim().toUpperCase()
   if (upper === 'EN') return 'gb-eng'
   if (upper === 'SC') return 'gb-sct'
   if (upper.length === 2) return upper.toLowerCase()
@@ -45,26 +46,26 @@ export function CountryFlag({
   showCode,
   className = '',
 }: {
-  code: string
-  url?: string
+  code: string | null | undefined
+  url?: string | null
   size?: Size
   showCode?: boolean
   className?: string
 }) {
   const { cls, imgW } = SIZES[size]
   const iso2 = getISO2(code)
-  const src = url ?? (iso2.includes('-') ? `https://flagcdn.com/${iso2}.svg` : `https://flagcdn.com/w${imgW}/${iso2}.png`)
+  const src = url || (iso2.includes('-') ? `https://flagcdn.com/${iso2}.svg` : `https://flagcdn.com/w${imgW}/${iso2}.png`)
 
   return (
     <span
       className={`${cls} rounded-full overflow-hidden flex-shrink-0 inline-flex items-center justify-center border ${className}`}
       style={{ borderColor: 'rgba(0,0,0,0.1)' }}
-      title={code}
-      aria-label={code}
+      title={code ?? ''}
+      aria-label={code ?? ''}
     >
       <img
         src={src}
-        alt={code}
+        alt={code ?? ''}
         className="w-full h-full object-cover"
         loading="lazy"
       />
