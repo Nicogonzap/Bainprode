@@ -80,9 +80,14 @@ function calcGroupStandings(groupMatches: DisplayMatch[], predictions: Predictio
     if (!table[m.awayId]) table[m.awayId] = { id: m.awayId, name: m.awayName, code: m.away, url: m.awayUrl, pj: 0, gf: 0, gc: 0, dg: 0, pts: 0 }
   }
   for (const m of groupMatches) {
-    const pred = predictions[m.id]
-    if (!pred || pred.home === '' || pred.away === '') continue
-    const hg = Number(pred.home), ag = Number(pred.away)
+    let hg: number, ag: number
+    if (m.estado === 'finalizado' && m.golesLocal !== null && m.golesVisitante !== null) {
+      hg = m.golesLocal; ag = m.golesVisitante
+    } else {
+      const pred = predictions[m.id]
+      if (!pred || pred.home === '' || pred.away === '') continue
+      hg = Number(pred.home); ag = Number(pred.away)
+    }
     table[m.homeId].pj++; table[m.homeId].gf += hg; table[m.homeId].gc += ag
     table[m.awayId].pj++; table[m.awayId].gf += ag; table[m.awayId].gc += hg
     if (hg > ag) table[m.homeId].pts += 3
@@ -363,7 +368,11 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
             </p>
           </div>
           <div className="lg:col-span-2 pt-6">
-            <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>SI TUS PREDICCIONES SE CUMPLEN</p>
+            <p className="text-xs font-bold uppercase mb-3" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
+              {matches.some(m => m.estado === 'finalizado')
+                ? 'RESULTADOS REALES + TUS PREDICCIONES'
+                : 'SI TUS PREDICCIONES SE CUMPLEN'}
+            </p>
             <StandingsTable standings={standings} />
             <p className="text-xs mt-3" style={{ color: BAIN.graySecondary }}>Los 2 primeros pasan a 16vos.<br /><span style={{ color: BAIN.grayTertiary }}>+ 8 mejores terceros de los 12 grupos.</span></p>
           </div>
@@ -457,7 +466,26 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
           <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />
           <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
         </div>
-        <div className="text-center"><span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span></div>
+        <div className="text-center">
+          {match.estado === 'finalizado' && match.golesLocal !== null && match.golesVisitante !== null ? (
+            <div className="flex flex-col items-center gap-0.5">
+              <span className="text-base font-bold tabular-nums" style={{ color: BAIN.black }}>
+                {match.golesLocal} – {match.golesVisitante}
+              </span>
+              {prediction.home !== '' && prediction.away !== '' && (
+                <span className="text-[10px] font-medium tabular-nums" style={{ color:
+                  Number(prediction.home) === match.golesLocal && Number(prediction.away) === match.golesVisitante
+                    ? BAIN.success
+                    : BAIN.grayTertiary
+                }}>
+                  pred {prediction.home}–{prediction.away}
+                </span>
+              )}
+            </div>
+          ) : (
+            <span className="text-sm" style={{ color: BAIN.graySecondary }}>vs</span>
+          )}
+        </div>
         <div className="flex items-center gap-2 justify-start">
           <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
           <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />
