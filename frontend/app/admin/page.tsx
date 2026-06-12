@@ -279,8 +279,9 @@ type PlayoffStanding = {
   pj: number; gf: number; gc: number; dg: number; pts: number
   group: string; posLabel: string
 }
+type PredMap = Record<string, { home: number; away: number }>
 
-function calcPlayoffStandings(groupMatches: ApiPartido[], group: string): PlayoffStanding[] {
+function calcPlayoffStandings(groupMatches: ApiPartido[], group: string, predictions: PredMap): PlayoffStanding[] {
   const table: Record<string, Omit<PlayoffStanding, 'dg' | 'posLabel'>> = {}
   for (const m of groupMatches) {
     if (!table[m.equipo_local.id])
@@ -289,8 +290,14 @@ function calcPlayoffStandings(groupMatches: ApiPartido[], group: string): Playof
       table[m.equipo_visitante.id] = { id: m.equipo_visitante.id, name: m.equipo_visitante.nombre_pais, code: m.equipo_visitante.codigo_iso, url: m.equipo_visitante.bandera_url, pj: 0, gf: 0, gc: 0, pts: 0, group }
   }
   for (const m of groupMatches) {
-    if (m.estado !== 'finalizado' || m.goles_local === null || m.goles_visitante === null) continue
-    const hg = m.goles_local, ag = m.goles_visitante
+    let hg: number, ag: number
+    if (m.estado === 'finalizado' && m.goles_local !== null && m.goles_visitante !== null) {
+      hg = m.goles_local; ag = m.goles_visitante
+    } else {
+      const pred = predictions[m.id]
+      if (!pred) continue
+      hg = pred.home; ag = pred.away
+    }
     table[m.equipo_local.id].pj++; table[m.equipo_local.id].gf += hg; table[m.equipo_local.id].gc += ag
     table[m.equipo_visitante.id].pj++; table[m.equipo_visitante.id].gf += ag; table[m.equipo_visitante.id].gc += hg
     if (hg > ag) table[m.equipo_local.id].pts += 3
@@ -304,7 +311,9 @@ function calcPlayoffStandings(groupMatches: ApiPartido[], group: string): Playof
 }
 
 function PlayoffsView() {
+  const { user } = useAuth()
   const [matches, setMatches] = useState<ApiPartido[]>([])
+  const [predictions, setPredictions] = useState<PredMap>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -314,13 +323,26 @@ function PlayoffsView() {
       .finally(() => setLoading(false))
   }, [])
 
+  useEffect(() => {
+    if (!user) return
+    fetch(`/api/predicciones?usuario_id=${user.id}`)
+      .then(r => r.json())
+      .then(({ data }) => {
+        if (!data) return
+        const mapped: PredMap = {}
+        for (const p of data) mapped[p.partido_id] = { home: p.goles_local, away: p.goles_visitante }
+        setPredictions(mapped)
+      })
+      .catch(() => {})
+  }, [user])
+
   const { byGroup, best8Thirds, bracket } = useMemo(() => {
     const empty = { byGroup: {} as Record<string, PlayoffStanding[]>, best8Thirds: [] as PlayoffStanding[], bracket: [] as [PlayoffStanding | null, PlayoffStanding | null][] }
     if (!matches.length) return empty
     const groups = ['A','B','C','D','E','F','G','H','I','J','K','L']
     const byGroup: Record<string, PlayoffStanding[]> = {}
     for (const g of groups) {
-      byGroup[g] = calcPlayoffStandings(matches.filter(m => m.grupo_fase === g), g)
+      byGroup[g] = calcPlayoffStandings(matches.filter(m => m.grupo_fase === g), g, predictions)
     }
     const allThirds: PlayoffStanding[] = groups.flatMap(g => byGroup[g]?.[2] ? [{ ...byGroup[g][2], group: g }] : [])
     const best8Thirds = [...allThirds].sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf).slice(0, 8)
@@ -333,7 +355,7 @@ function PlayoffsView() {
     }
     for (let i = 0; i < 4; i++) bracket.push([best8Thirds[i] ?? null, best8Thirds[7 - i] ?? null])
     return { byGroup, best8Thirds, bracket }
-  }, [matches])
+  }, [matches, predictions])
 
   const finishedCount = matches.filter(m => m.estado === 'finalizado').length
 
@@ -349,7 +371,7 @@ function PlayoffsView() {
         <div>
           <h1 className="text-3xl font-bold tracking-tight" style={{ color: BAIN.black }}>Playoffs</h1>
           <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>
-            Basado en {finishedCount}/{matches.length} partidos de grupos finalizados
+            Basado en resultados reales + tus predicciones ({finishedCount}/{matches.length} partidos jugados)
           </p>
         </div>
         <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: `${BAIN.amber}15`, color: BAIN.amber, border: `1px solid ${BAIN.amber}40` }}>
