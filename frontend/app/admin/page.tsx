@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
-import { Save, Trash2, Calendar, Grid3x3, Users, AlertTriangle } from 'lucide-react'
+import { Save, Trash2, Calendar, Grid3x3, Users, AlertTriangle, Trophy } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -274,6 +274,190 @@ function UsersView({ getToken, toast }: {
   )
 }
 
+type PlayoffStanding = {
+  id: string; name: string; code: string; url: string | null
+  pj: number; gf: number; gc: number; dg: number; pts: number
+  group: string; posLabel: string
+}
+
+function calcPlayoffStandings(groupMatches: ApiPartido[], group: string): PlayoffStanding[] {
+  const table: Record<string, Omit<PlayoffStanding, 'dg' | 'posLabel'>> = {}
+  for (const m of groupMatches) {
+    if (!table[m.equipo_local.id])
+      table[m.equipo_local.id] = { id: m.equipo_local.id, name: m.equipo_local.nombre_pais, code: m.equipo_local.codigo_iso, url: m.equipo_local.bandera_url, pj: 0, gf: 0, gc: 0, pts: 0, group }
+    if (!table[m.equipo_visitante.id])
+      table[m.equipo_visitante.id] = { id: m.equipo_visitante.id, name: m.equipo_visitante.nombre_pais, code: m.equipo_visitante.codigo_iso, url: m.equipo_visitante.bandera_url, pj: 0, gf: 0, gc: 0, pts: 0, group }
+  }
+  for (const m of groupMatches) {
+    if (m.estado !== 'finalizado' || m.goles_local === null || m.goles_visitante === null) continue
+    const hg = m.goles_local, ag = m.goles_visitante
+    table[m.equipo_local.id].pj++; table[m.equipo_local.id].gf += hg; table[m.equipo_local.id].gc += ag
+    table[m.equipo_visitante.id].pj++; table[m.equipo_visitante.id].gf += ag; table[m.equipo_visitante.id].gc += hg
+    if (hg > ag) table[m.equipo_local.id].pts += 3
+    else if (hg < ag) table[m.equipo_visitante.id].pts += 3
+    else { table[m.equipo_local.id].pts += 1; table[m.equipo_visitante.id].pts += 1 }
+  }
+  return Object.values(table)
+    .map(t => ({ ...t, dg: t.gf - t.gc }))
+    .sort((a, b) => b.pts - a.pts || (b.gf - b.gc) - (a.gf - a.gc) || b.gf - a.gf)
+    .map((t, i) => ({ ...t, posLabel: `${i + 1}°` }))
+}
+
+function PlayoffsView() {
+  const [matches, setMatches] = useState<ApiPartido[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/partidos?fase=grupos')
+      .then(r => r.json())
+      .then(({ data }) => { if (data) setMatches(data) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const { byGroup, best8Thirds, bracket } = useMemo(() => {
+    const empty = { byGroup: {} as Record<string, PlayoffStanding[]>, best8Thirds: [] as PlayoffStanding[], bracket: [] as [PlayoffStanding | null, PlayoffStanding | null][] }
+    if (!matches.length) return empty
+    const groups = ['A','B','C','D','E','F','G','H','I','J','K','L']
+    const byGroup: Record<string, PlayoffStanding[]> = {}
+    for (const g of groups) {
+      byGroup[g] = calcPlayoffStandings(matches.filter(m => m.grupo_fase === g), g)
+    }
+    const allThirds: PlayoffStanding[] = groups.flatMap(g => byGroup[g]?.[2] ? [{ ...byGroup[g][2], group: g }] : [])
+    const best8Thirds = [...allThirds].sort((a, b) => b.pts - a.pts || b.dg - a.dg || b.gf - a.gf).slice(0, 8)
+    const getQ = (pos: 0 | 1, g: string): PlayoffStanding | null => byGroup[g]?.[pos] ?? null
+    const bracket: [PlayoffStanding | null, PlayoffStanding | null][] = []
+    const groupPairs: [string, string][] = [['A','B'],['C','D'],['E','F'],['G','H'],['I','J'],['K','L']]
+    for (const [x, y] of groupPairs) {
+      bracket.push([getQ(0, x), getQ(1, y)])
+      bracket.push([getQ(0, y), getQ(1, x)])
+    }
+    for (let i = 0; i < 4; i++) bracket.push([best8Thirds[i] ?? null, best8Thirds[7 - i] ?? null])
+    return { byGroup, best8Thirds, bracket }
+  }, [matches])
+
+  const finishedCount = matches.filter(m => m.estado === 'finalizado').length
+
+  if (loading) return (
+    <div className="flex justify-center py-20">
+      <div className="w-6 h-6 rounded-full border-2 animate-spin" style={{ borderColor: `${BAIN.red} transparent transparent transparent` }} />
+    </div>
+  )
+
+  return (
+    <section>
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight" style={{ color: BAIN.black }}>Playoffs</h1>
+          <p className="text-sm mt-1" style={{ color: BAIN.graySecondary }}>
+            Basado en {finishedCount}/{matches.length} partidos de grupos finalizados
+          </p>
+        </div>
+        <span className="text-xs px-2 py-1 rounded font-bold" style={{ backgroundColor: `${BAIN.amber}15`, color: BAIN.amber, border: `1px solid ${BAIN.amber}40` }}>
+          TEST · Proyección
+        </span>
+      </div>
+
+      <h2 className="text-xs font-bold uppercase mb-3 tracking-wider" style={{ color: BAIN.graySecondary }}>32 Clasificados</h2>
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+        {['A','B','C','D','E','F','G','H','I','J','K','L'].map(g => {
+          const rows = byGroup[g] ?? []
+          return (
+            <div key={g} className="rounded-md overflow-hidden" style={{ border: `1px solid ${BAIN.grayBorder}` }}>
+              <div className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wider" style={{ backgroundColor: BAIN.black, color: BAIN.white }}>Grupo {g}</div>
+              {rows.slice(0, 4).map((row, idx) => {
+                const qualifies = idx < 2
+                const isTop8Third = idx === 2 && best8Thirds.some(t => t.id === row.id)
+                return (
+                  <div key={row.id} className="flex items-center gap-2 px-3 py-2"
+                    style={{
+                      backgroundColor: qualifies ? `${BAIN.success}08` : isTop8Third ? `${BAIN.amber}08` : BAIN.white,
+                      borderTop: idx > 0 ? `1px solid ${BAIN.grayBorder}` : undefined,
+                      opacity: !qualifies && !isTop8Third ? 0.45 : 1,
+                    }}>
+                    <span className="text-[10px] font-bold w-4 flex-shrink-0"
+                      style={{ color: qualifies ? BAIN.success : isTop8Third ? BAIN.amber : BAIN.grayTertiary }}>
+                      {idx + 1}°
+                    </span>
+                    <CountryFlag code={row.code} url={row.url ?? undefined} size="sm" />
+                    <span className="text-xs font-medium flex-1 truncate" style={{ color: BAIN.black }}>{row.name}</span>
+                    <span className="text-[10px] flex-shrink-0" style={{ color: BAIN.graySecondary }}>{row.pts}pts</span>
+                    {isTop8Third && (
+                      <span className="text-[9px] font-bold px-1 py-0.5 rounded flex-shrink-0" style={{ backgroundColor: `${BAIN.amber}25`, color: BAIN.amber }}>3M</span>
+                    )}
+                  </div>
+                )
+              })}
+              {rows.length === 0 && (
+                <div className="px-3 py-4 text-xs text-center" style={{ color: BAIN.grayTertiary }}>Sin datos</div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
+      <h2 className="text-xs font-bold uppercase mb-3 tracking-wider" style={{ color: BAIN.graySecondary }}>Llave — Octavos de Final</h2>
+      {bracket.length === 0 ? (
+        <p className="text-sm text-center py-10" style={{ color: BAIN.graySecondary }}>
+          Sin proyección aún — cargá resultados de grupos para ver la llave.
+        </p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          {bracket.map(([home, away], i) => {
+            const isThirds = i >= 12
+            const groupPairs = [['A','B'],['C','D'],['E','F'],['G','H'],['I','J'],['K','L']]
+            const matchLabel = isThirds
+              ? `3er puesto · Cruce ${i - 11}`
+              : (() => {
+                  const [x, y] = groupPairs[Math.floor(i / 2)]
+                  return i % 2 === 0 ? `1° Grp ${x} vs 2° Grp ${y}` : `1° Grp ${y} vs 2° Grp ${x}`
+                })()
+            return (
+              <div key={i} className="rounded-md px-4 py-3"
+                style={{ backgroundColor: BAIN.white, border: `1px solid ${isThirds ? BAIN.amber + '40' : BAIN.grayBorder}` }}>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider"
+                    style={{ color: isThirds ? BAIN.amber : BAIN.grayTertiary }}>{matchLabel}</span>
+                  <span className="text-[10px]" style={{ color: BAIN.grayTertiary }}>M{49 + i}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0">
+                    {home ? (
+                      <>
+                        <CountryFlag code={home.code} url={home.url ?? undefined} size="sm" />
+                        <span className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{home.name}</span>
+                        <span className="text-[10px] px-1 rounded flex-shrink-0" style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary }}>
+                          {home.posLabel} {home.group}
+                        </span>
+                      </>
+                    ) : (
+                      <span className="text-xs italic" style={{ color: BAIN.grayTertiary }}>Por definir</span>
+                    )}
+                  </div>
+                  <span className="text-xs font-bold flex-shrink-0" style={{ color: BAIN.graySecondary }}>vs</span>
+                  <div className="flex items-center gap-1.5 flex-1 min-w-0 justify-end">
+                    {away ? (
+                      <>
+                        <span className="text-[10px] px-1 rounded flex-shrink-0" style={{ backgroundColor: BAIN.grayBg, color: BAIN.graySecondary }}>
+                          {away.posLabel} {away.group}
+                        </span>
+                        <span className="text-sm font-bold truncate" style={{ color: BAIN.black }}>{away.name}</span>
+                        <CountryFlag code={away.code} url={away.url ?? undefined} size="sm" />
+                      </>
+                    ) : (
+                      <span className="text-xs italic" style={{ color: BAIN.grayTertiary }}>Por definir</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </section>
+  )
+}
+
+
 function AdminContent() {
   const { toast } = useToast()
   const { user, loading: authLoading } = useAuth()
@@ -282,7 +466,7 @@ function AdminContent() {
   const [loading, setLoading] = useState(true)
   const [results, setResults] = useState<Results>({})
   const [saving, setSaving] = useState<Record<string, boolean>>({})
-  const [viewMode, setViewMode] = useState<'fecha' | 'grupo' | 'usuarios'>('fecha')
+  const [viewMode, setViewMode] = useState<'fecha' | 'grupo' | 'usuarios' | 'playoffs'>('fecha')
 
   useEffect(() => {
     if (authLoading) return
@@ -404,6 +588,7 @@ function AdminContent() {
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Users size={14} strokeWidth={2} />} label="Usuarios" active={viewMode === 'usuarios'} onClick={() => setViewMode('usuarios')} />
+            <ViewTab icon={<Trophy size={14} strokeWidth={2} />} label="Playoffs" active={viewMode === 'playoffs'} onClick={() => setViewMode('playoffs')} />
           </nav>
           <div className="ml-auto flex items-center gap-3">
             <span className="text-xs" style={{ color: BAIN.graySecondary }}>{finalizadoCount} / {partidos.length} finalizados</span>
@@ -454,8 +639,10 @@ function AdminContent() {
               </div>
             </section>
           ))
-        ) : (
+        ) : viewMode === 'usuarios' ? (
           <UsersView getToken={getToken} toast={toast} />
+        ) : (
+          <PlayoffsView />
         )}
       </main>
       <Footer />
