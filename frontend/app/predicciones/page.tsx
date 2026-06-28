@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useMemo, useEffect, useCallback } from 'react'
-import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff, Lock, BarChart2, AlertTriangle } from 'lucide-react'
+import { ChevronDown, Check, Calendar, Grid3x3, Save, CloudOff, Lock, BarChart2, AlertTriangle, Trophy } from 'lucide-react'
 import { TopNav } from '@/components/top-nav'
 import { Footer } from '@/components/footer'
 import { CountryFlag } from '@/components/country-flag'
@@ -35,7 +35,7 @@ const PLAYOFF_FASES: { key: string; label: string }[] = [
   { key: 'final', label: 'Final' },
 ]
 
-type ViewMode = 'fecha' | 'grupo' | 'resultados'
+type ViewMode = 'fecha' | 'grupo' | 'resultados' | 'playoffs'
 type Predictions = Record<string, { home: number | ''; away: number | '' }>
 type PredPoints = Record<string, number | null>
 
@@ -268,6 +268,7 @@ function PrediccionesContent() {
           <nav className="flex items-center gap-1" role="tablist">
             <ViewTab icon={<Grid3x3 size={14} strokeWidth={2} />} label="Por grupo" active={viewMode === 'grupo'} onClick={() => setViewMode('grupo')} />
             <ViewTab icon={<Calendar size={14} strokeWidth={2} />} label="Por fecha" active={viewMode === 'fecha'} onClick={() => setViewMode('fecha')} />
+            <ViewTab icon={<Trophy size={14} strokeWidth={2} />} label="Playoffs" active={viewMode === 'playoffs'} onClick={() => setViewMode('playoffs')} />
             <ViewTab icon={<BarChart2 size={14} strokeWidth={2} />} label="Mis resultados" active={viewMode === 'resultados'} onClick={() => setViewMode('resultados')} />
           </nav>
           <button
@@ -324,24 +325,24 @@ function PrediccionesContent() {
                 delay={gIdx * 50}
               />
             ))}
-
-            {playoffSections.length > 0 && (
-              <div className="mt-10">
-                <div className="flex items-center gap-3 mb-5">
-                  <h2 className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>Playoffs</h2>
-                  <div className="flex-1 h-px" style={{ backgroundColor: BAIN.grayBorder }} />
-                </div>
-                {playoffSections.map((p, pIdx) => (
-                  <PlayoffSection
-                    key={p.fase}
-                    label={p.label}
-                    matches={p.matches}
-                    predictions={predictions}
-                    onUpdate={updatePrediction}
-                    onClear={clearPrediction}
-                    delay={pIdx * 50}
-                  />
-                ))}
+          </>
+        ) : viewMode === 'playoffs' ? (
+          <>
+            {playoffSections.length > 0 ? (
+              playoffSections.map((p, pIdx) => (
+                <PlayoffSection
+                  key={p.fase}
+                  label={p.label}
+                  matches={p.matches}
+                  predictions={predictions}
+                  onUpdate={updatePrediction}
+                  onClear={clearPrediction}
+                  delay={pIdx * 50}
+                />
+              ))
+            ) : (
+              <div className="rounded-md p-10 text-center" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
+                <p className="text-sm" style={{ color: BAIN.graySecondary }}>Todavía no hay partidos de playoffs cargados.</p>
               </div>
             )}
           </>
