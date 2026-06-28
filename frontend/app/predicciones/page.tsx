@@ -24,6 +24,17 @@ const DAYS_ES = ['DOMINGO', 'LUNES', 'MARTES', 'MIÉRCOLES', 'JUEVES', 'VIERNES'
 const MONTHS_ES = ['ENERO', 'FEBRERO', 'MARZO', 'ABRIL', 'MAYO', 'JUNIO', 'JULIO', 'AGOSTO', 'SEPTIEMBRE', 'OCTUBRE', 'NOVIEMBRE', 'DICIEMBRE']
 const MONTHS_SHORT = ['ENE', 'FEB', 'MAR', 'ABR', 'MAY', 'JUN', 'JUL', 'AGO', 'SEP', 'OCT', 'NOV', 'DIC']
 
+// Fases de playoff: nombre tal cual viene de la base -> título lindo para mostrar.
+// El orden del array define en qué orden aparecen las secciones.
+const PLAYOFF_FASES: { key: string; label: string }[] = [
+  { key: '16vos', label: 'Dieciseisavos de final' },
+  { key: 'octavos', label: 'Octavos de final' },
+  { key: 'cuartos', label: 'Cuartos de final' },
+  { key: 'semifinal', label: 'Semifinales' },
+  { key: 'tercer_puesto', label: 'Tercer puesto' },
+  { key: 'final', label: 'Final' },
+]
+
 type ViewMode = 'fecha' | 'grupo' | 'resultados'
 type Predictions = Record<string, { home: number | ''; away: number | '' }>
 type PredPoints = Record<string, number | null>
@@ -36,7 +47,7 @@ type ApiPartido = {
   equipo_local: ApiEquipo; equipo_visitante: ApiEquipo
 }
 type DisplayMatch = {
-  id: string; group: string
+  id: string; group: string; fase: string
   home: string; homeUrl: string | null; homeName: string; homeId: string
   away: string; awayUrl: string | null; awayName: string; awayId: string
   dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string; fecha_hora: string; golesLocal: number | null; golesVisitante: number | null
@@ -56,6 +67,7 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
   return {
     id: p.id,
     group: p.grupo_fase ?? '',
+    fase: p.fase,
     home: p.equipo_local.codigo_iso,
     homeUrl: p.equipo_local.bandera_url,
     homeName: p.equipo_local.nombre_pais,
@@ -112,7 +124,7 @@ function PrediccionesContent() {
   const [predPoints, setPredPoints] = useState<PredPoints>({})
 
   useEffect(() => {
-    fetch('/api/partidos?fase=grupos')
+    fetch('/api/partidos')
       .then(r => r.json())
       .then(({ data }) => { if (data) setMatches((data as ApiPartido[]).map(toDisplayMatch)) })
       .finally(() => setLoading(false))
@@ -215,12 +227,35 @@ function PrediccionesContent() {
   const groupSections = useMemo(() => {
     const map = new Map<string, DisplayMatch[]>()
     for (const m of matches) {
+      if (m.fase !== 'grupos') continue
       if (!map.has(m.group)) map.set(m.group, [])
       map.get(m.group)!.push(m)
     }
     return Array.from(map.entries())
       .sort(([a], [b]) => a.localeCompare(b))
       .map(([group, ms]) => ({ group, matches: ms }))
+  }, [matches])
+
+  // Secciones de playoff (16vos en adelante), agrupadas por fase y en orden.
+  const playoffSections = useMemo(() => {
+    const byFase = new Map<string, DisplayMatch[]>()
+    for (const m of matches) {
+      if (m.fase === 'grupos') continue
+      if (!byFase.has(m.fase)) byFase.set(m.fase, [])
+      byFase.get(m.fase)!.push(m)
+    }
+    // Ordenar las fases según PLAYOFF_FASES; las desconocidas van al final.
+    return Array.from(byFase.entries())
+      .map(([fase, ms]) => {
+        const def = PLAYOFF_FASES.find(f => f.key === fase)
+        return {
+          fase,
+          label: def?.label ?? fase,
+          order: def ? PLAYOFF_FASES.indexOf(def) : 999,
+          matches: ms.sort((a, b) => a.fecha_hora.localeCompare(b.fecha_hora)),
+        }
+      })
+      .sort((a, b) => a.order - b.order)
   }, [matches])
 
   return (
@@ -289,6 +324,26 @@ function PrediccionesContent() {
                 delay={gIdx * 50}
               />
             ))}
+
+            {playoffSections.length > 0 && (
+              <div className="mt-10">
+                <div className="flex items-center gap-3 mb-5">
+                  <h2 className="text-2xl font-bold tracking-tight" style={{ color: BAIN.black }}>Playoffs</h2>
+                  <div className="flex-1 h-px" style={{ backgroundColor: BAIN.grayBorder }} />
+                </div>
+                {playoffSections.map((p, pIdx) => (
+                  <PlayoffSection
+                    key={p.fase}
+                    label={p.label}
+                    matches={p.matches}
+                    predictions={predictions}
+                    onUpdate={updatePrediction}
+                    onClear={clearPrediction}
+                    delay={pIdx * 50}
+                  />
+                ))}
+              </div>
+            )}
           </>
         ) : viewMode === 'resultados' ? (
           <ResultsView
@@ -376,6 +431,48 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
             <StandingsTable standings={standings} />
             <p className="text-xs mt-3" style={{ color: BAIN.graySecondary }}>Los 2 primeros pasan a 16vos.<br /><span style={{ color: BAIN.grayTertiary }}>+ 8 mejores terceros de los 12 grupos.</span></p>
           </div>
+        </div>
+      )}
+    </section>
+  )
+}
+
+function PlayoffSection({ label, matches, predictions, onUpdate, onClear, delay }: {
+  label: string; matches: DisplayMatch[]
+  predictions: Predictions
+  onUpdate: (id: string, side: 'home' | 'away', v: string) => void
+  onClear: (id: string) => void
+  delay: number
+}) {
+  const [expanded, setExpanded] = useState(true)
+  const filledCount = matches.filter(m => { const p = predictions[m.id]; return p && p.home !== '' && p.away !== '' }).length
+  const total = matches.length
+
+  return (
+    <section className="mb-6 rounded-md overflow-hidden animate-in fade-in slide-in-from-bottom-2" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}`, animationDelay: `${delay}ms`, animationFillMode: 'backwards', animationDuration: '400ms' }}>
+      <button type="button" onClick={() => setExpanded(s => !s)} className="w-full px-4 sm:px-6 py-4 flex items-center justify-between gap-2 hover:bg-gray-50 transition-colors">
+        <div className="flex items-center gap-2 sm:gap-4 min-w-0 flex-1">
+          <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-md flex items-center justify-center font-bold text-xs flex-shrink-0" style={{ backgroundColor: BAIN.red, color: BAIN.white }}>PO</div>
+          <div className="text-left">
+            <p className="text-base font-bold tracking-tight" style={{ color: BAIN.black }}>{label}</p>
+            <p className="text-xs" style={{ color: BAIN.graySecondary }}>{total} partido{total !== 1 ? 's' : ''}</p>
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs font-bold" style={{ color: filledCount === total ? BAIN.success : filledCount > 0 ? BAIN.red : BAIN.graySecondary }}>
+            {filledCount === total ? <span className="flex items-center gap-1"><Check size={12} strokeWidth={3} />{filledCount}/{total}</span> : `${filledCount}/${total}`}
+          </span>
+          <ChevronDown size={18} strokeWidth={2} style={{ color: BAIN.graySecondary, transform: expanded ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.2s' }} />
+        </div>
+      </button>
+      {expanded && (
+        <div className="px-3 sm:px-6 pb-4 sm:pb-6 pt-6 flex flex-col gap-3" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
+          {matches.map(m => (
+            <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />
+          ))}
+          <p className="text-xs text-center mt-1" style={{ color: BAIN.graySecondary }}>
+            Usá el botón <strong>Guardar</strong> en la barra superior para guardar todas las predicciones.
+          </p>
         </div>
       )}
     </section>
