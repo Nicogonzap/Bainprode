@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+﻿import { NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 
 const API_KEY = process.env.API_FOOTBALL_KEY!
@@ -19,7 +19,7 @@ async function fetchApi<T>(path: string): Promise<T> {
     headers: { 'x-apisports-key': API_KEY },
     next: { revalidate: 0 },
   })
-  if (!res.ok) throw new Error(`API-Football ${path} → HTTP ${res.status}`)
+  if (!res.ok) throw new Error(`API-Football ${path} -> HTTP ${res.status}`)
   return res.json() as Promise<T>
 }
 
@@ -28,6 +28,65 @@ function mapEstado(short: string): string {
   if (['FT', 'AET', 'PEN'].includes(short)) return 'finalizado'
   if (['PST', 'CANC', 'SUSP', 'ABD', 'WO', 'AWD'].includes(short)) return 'suspendido'
   return 'programado'
+}
+
+const ALIAS: Record<string, string> = {
+  usa: 'estados unidos',
+  'united states': 'estados unidos',
+  netherlands: 'paises bajos',
+  england: 'inglaterra',
+  brazil: 'brasil',
+  germany: 'alemania',
+  spain: 'espana',
+  france: 'francia',
+  'south korea': 'corea del sur',
+  'korea republic': 'corea del sur',
+  japan: 'japon',
+  switzerland: 'suiza',
+  'czech republic': 'republica checa',
+  czechia: 'republica checa',
+  croatia: 'croacia',
+  turkey: 'turquia',
+  iran: 'iran',
+  iraq: 'irak',
+  'saudi arabia': 'arabia saudita',
+  morocco: 'marruecos',
+  'ivory coast': 'costa de marfil',
+  scotland: 'escocia',
+  norway: 'noruega',
+  sweden: 'suecia',
+  belgium: 'belgica',
+  algeria: 'argelia',
+  egypt: 'egipto',
+  'new zealand': 'nueva zelanda',
+  panama: 'panama',
+  canada: 'canada',
+  haiti: 'haiti',
+  argentina: 'argentina',
+  colombia: 'colombia',
+  ecuador: 'ecuador',
+  uruguay: 'uruguay',
+  mexico: 'mexico',
+  portugal: 'portugal',
+  senegal: 'senegal',
+  ghana: 'ghana',
+  qatar: 'catar',
+  austria: 'austria',
+  jordan: 'jordania',
+  uzbekistan: 'uzbekistan',
+  'cape verde': 'cabo verde',
+  'cape verde islands': 'cabo verde',
+  'dr congo': 'congo dr',
+  'democratic republic of congo': 'congo dr',
+}
+
+function stripDiacritics(s: string): string {
+  return s.normalize('NFD').replace(/[̀-ͯ]/g, '')
+}
+
+function normalizarNombre(nombre: string): string {
+  const lower = stripDiacritics(nombre).toLowerCase().trim()
+  return ALIAS[lower] ?? lower
 }
 
 // Vercel Cron sends GET with Authorization: Bearer CRON_SECRET
@@ -43,14 +102,15 @@ export async function GET(request: Request) {
   try {
     const supabase = getServerClient()
 
-    // Fetch today + yesterday from API-Football (covers late finishes)
+    // Fetch today + yesterday + tomorrow from API-Football (covers late finishes)
     const today = new Date().toISOString().slice(0, 10)
     const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
     const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10)
 
     interface ApiFixture {
-      fixture: { id: number; status: { short: string; elapsed: number | null } }
+      fixture: { id: number; date: string; status: { short: string; elapsed: number | null } }
       goals: { home: number | null; away: number | null }
+      teams: { home: { name: string }; away: { name: string } }
     }
     const [res1, res2, res3] = await Promise.all([
       fetchApi<{ response: ApiFixture[] }>(`/fixtures?league=${LEAGUE}&season=${SEASON}&date=${yesterday}`),
@@ -69,10 +129,8 @@ export async function GET(request: Request) {
       .select('id, api_fixture_id, estado, goles_local, goles_visitante')
       .in('api_fixture_id', apiIds)
 
-    if (!partidos || partidos.length === 0) return NextResponse.json({ updated: 0, scored: 0 })
-
-    const partidoMap = new Map<number, typeof partidos[0]>()
-    for (const p of partidos) {
+    const partidoMap = new Map<number, NonNullable<typeof partidos>[0]>()
+    for (const p of (partidos ?? [])) {
       if (p.api_fixture_id) partidoMap.set(p.api_fixture_id, p)
     }
 
@@ -146,6 +204,86 @@ export async function GET(request: Request) {
           console.error(`Error scoring partido ${partido.id}:`, rpcError.message)
         } else {
           scored++
+        }
+      }
+    }
+
+    // Fallback: match API fixtures to DB partidos with null api_fixture_id by date + team names
+    const linkedApiIds = new Set(Array.from(partidoMap.keys()))
+    const unmatchedFixtures = apiFixtures.filter((f) => !linkedApiIds.has(f.fixture.id))
+
+    if (unmatchedFixtures.length > 0) {
+      const [{ data: equipos }, { data: unlinked }] = await Promise.all([
+        supabase.from('equipos').select('id, nombre_pais'),
+        supabase
+          .from('partidos')
+          .select('id, api_fixture_id, estado, goles_local, goles_visitante, fecha_hora, equipo_local_id, equipo_visitante_id')
+          .is('api_fixture_id', null),
+      ])
+
+      if (equipos && unlinked && unlinked.length > 0) {
+        const equipoByName = new Map<string, string>()
+        for (const eq of equipos) equipoByName.set(normalizarNombre(eq.nombre_pais), eq.id)
+
+        for (const fixture of unmatchedFixtures) {
+          const homeNorm = normalizarNombre(fixture.teams.home.name)
+          const awayNorm = normalizarNombre(fixture.teams.away.name)
+          const homeId = equipoByName.get(homeNorm)
+          const awayId = equipoByName.get(awayNorm)
+          if (!homeId || !awayId) continue
+
+          const fDate = fixture.fixture.date.slice(0, 10)
+          const match = unlinked.find((p) => {
+            return (
+              p.fecha_hora.slice(0, 10) === fDate &&
+              p.equipo_local_id === homeId &&
+              p.equipo_visitante_id === awayId
+            )
+          })
+          if (!match) continue
+
+          const nuevoEstado = mapEstado(fixture.fixture.status.short)
+
+          if (nuevoEstado === 'programado') {
+            await supabase
+              .from('partidos')
+              .update({ api_fixture_id: fixture.fixture.id, ultimo_sync: new Date().toISOString() })
+              .eq('id', match.id)
+            continue
+          }
+
+          let ganadorId: string | null = null
+          if (
+            nuevoEstado === 'finalizado' &&
+            fixture.goals.home !== null &&
+            fixture.goals.away !== null
+          ) {
+            if (fixture.goals.home > fixture.goals.away) ganadorId = homeId
+            else if (fixture.goals.away > fixture.goals.home) ganadorId = awayId
+          }
+
+          const { error: uErr } = await supabase
+            .from('partidos')
+            .update({
+              api_fixture_id: fixture.fixture.id,
+              estado: nuevoEstado,
+              goles_local: fixture.goals.home,
+              goles_visitante: fixture.goals.away,
+              minuto_juego: fixture.fixture.status.elapsed ?? null,
+              ...(ganadorId ? { ganador_id: ganadorId } : {}),
+              ultimo_sync: new Date().toISOString(),
+            })
+            .eq('id', match.id)
+
+          if (!uErr) {
+            updated++
+            if (nuevoEstado === 'finalizado' && match.estado !== 'finalizado') {
+              const { error: rpcErr } = await supabase.rpc('calcular_puntos_prediccion', {
+                p_partido_id: match.id,
+              })
+              if (!rpcErr) scored++
+            }
+          }
         }
       }
     }

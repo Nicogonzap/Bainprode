@@ -6,12 +6,13 @@ import { useState, useEffect, useRef } from 'react'
 import { Menu, X, User } from 'lucide-react'
 import { useAuth } from '@/lib/auth-context'
 
-type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo' | 'admin'
+type ActivePage = 'home' | 'predicciones' | 'especiales' | 'tabla' | 'mi-torneo' | 'puntos' | 'admin'
 
 const NAV_LINKS: { href: string; label: string; key: ActivePage }[] = [
   { href: '/home', label: 'Inicio', key: 'home' },
   { href: '/predicciones', label: 'Predicciones', key: 'predicciones' },
   { href: '/especiales', label: 'Especiales', key: 'especiales' },
+  { href: '/puntos', label: 'Puntos', key: 'puntos' },
   { href: '/tabla', label: 'Resultados', key: 'tabla' },
   { href: '/mi-torneo', label: 'Mis torneos', key: 'mi-torneo' },
 ]
@@ -20,6 +21,7 @@ function detectActive(pathname: string): ActivePage | null {
   if (pathname.startsWith('/home')) return 'home'
   if (pathname.startsWith('/predicciones')) return 'predicciones'
   if (pathname.startsWith('/especiales')) return 'especiales'
+  if (pathname.startsWith('/puntos')) return 'puntos'
   if (pathname.startsWith('/tabla')) return 'tabla'
   if (pathname.startsWith('/mi-torneo')) return 'mi-torneo'
   if (pathname.startsWith('/admin')) return 'admin'

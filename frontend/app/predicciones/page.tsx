@@ -44,13 +44,14 @@ type ApiPartido = {
   id: string; fecha_hora: string; estadio: string | null; ciudad: string | null
   fase: string; grupo_fase: string | null; estado: string
   goles_local: number | null; goles_visitante: number | null
-  equipo_local: ApiEquipo; equipo_visitante: ApiEquipo
+  equipo_local: ApiEquipo | null; equipo_visitante: ApiEquipo | null
 }
 type DisplayMatch = {
   id: string; group: string; fase: string
   home: string; homeUrl: string | null; homeName: string; homeId: string
   away: string; awayUrl: string | null; awayName: string; awayId: string
   dateSort: string; dateLabel: string; shortDate: string; time: string; venue: string; estado: string; fecha_hora: string; golesLocal: number | null; golesVisitante: number | null
+  teamsConfirmed: boolean
 }
 type StandingRow = {
   id: string; name: string; code: string; url: string | null
@@ -64,24 +65,26 @@ function toDisplayMatch(p: ApiPartido): DisplayMatch {
   const dateLabel = `${DAYS_ES[inTz.getDay()]} ${inTz.getDate()} DE ${MONTHS_ES[inTz.getMonth()]}`
   const shortDate = `${inTz.getDate()} ${MONTHS_SHORT[inTz.getMonth()]}`
   const time = `${String(inTz.getHours()).padStart(2, '0')}.${String(inTz.getMinutes()).padStart(2, '0')}`
+  const teamsConfirmed = p.equipo_local !== null && p.equipo_visitante !== null
   return {
     id: p.id,
     group: p.grupo_fase ?? '',
     fase: p.fase,
-    home: p.equipo_local.codigo_iso,
-    homeUrl: p.equipo_local.bandera_url,
-    homeName: p.equipo_local.nombre_pais,
-    homeId: p.equipo_local.id,
-    away: p.equipo_visitante.codigo_iso,
-    awayUrl: p.equipo_visitante.bandera_url,
-    awayName: p.equipo_visitante.nombre_pais,
-    awayId: p.equipo_visitante.id,
+    home: p.equipo_local?.codigo_iso ?? '',
+    homeUrl: p.equipo_local?.bandera_url ?? null,
+    homeName: p.equipo_local?.nombre_pais ?? 'Por definir',
+    homeId: p.equipo_local?.id ?? '',
+    away: p.equipo_visitante?.codigo_iso ?? '',
+    awayUrl: p.equipo_visitante?.bandera_url ?? null,
+    awayName: p.equipo_visitante?.nombre_pais ?? 'Por definir',
+    awayId: p.equipo_visitante?.id ?? '',
     dateSort, dateLabel, shortDate, time,
     venue: [p.estadio, p.ciudad].filter(Boolean).join(', '),
     estado: p.estado,
     fecha_hora: p.fecha_hora,
     golesLocal: p.goles_local,
     golesVisitante: p.goles_visitante,
+    teamsConfirmed,
   }
 }
 
@@ -416,7 +419,7 @@ function GroupSection({ groupKey, matches, predictions, onUpdate, onClear, delay
             <p className="text-xs font-bold uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>PARTIDOS DEL GRUPO</p>
             <div className="flex flex-col gap-3">
               {matches.map(m => (
-                <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />
+                <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact teamsConfirmed={m.teamsConfirmed} />
               ))}
             </div>
             <p className="text-xs text-center" style={{ color: BAIN.graySecondary }}>
@@ -469,7 +472,7 @@ function PlayoffSection({ label, matches, predictions, onUpdate, onClear, delay 
       {expanded && (
         <div className="px-3 sm:px-6 pb-4 sm:pb-6 pt-6 flex flex-col gap-3" style={{ borderTop: `1px solid ${BAIN.grayBorder}` }}>
           {matches.map(m => (
-            <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact />
+            <MatchCard key={m.id} match={m} prediction={predictions[m.id] ?? { home: '', away: '' }} onUpdate={onUpdate} onClear={onClear} compact teamsConfirmed={m.teamsConfirmed} />
           ))}
           <p className="text-xs text-center mt-1" style={{ color: BAIN.graySecondary }}>
             Usá el botón <strong>Guardar</strong> en la barra superior para guardar todas las predicciones.
@@ -523,16 +526,16 @@ function ViewTab({ icon, label, active, onClick }: { icon: React.ReactNode; labe
   )
 }
 
-function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, compact = false }: {
+function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, compact = false, teamsConfirmed = true }: {
   match: DisplayMatch; prediction: { home: number | ''; away: number | '' }
   onUpdate: (id: string, side: 'home' | 'away', v: string) => void
   onClear: (id: string) => void
-  showGroup?: boolean; compact?: boolean
+  showGroup?: boolean; compact?: boolean; teamsConfirmed?: boolean
 }) {
   const hasPrediction = prediction.home !== '' && prediction.away !== ''
   const now = new Date()
   const cutoffTime = new Date(new Date(match.fecha_hora).getTime() - 60 * 60 * 1000)
-  const isMatchLocked = now >= cutoffTime || match.estado === 'finalizado' || match.estado === 'en_curso'
+  const isMatchLocked = !teamsConfirmed || now >= cutoffTime || match.estado === 'finalizado' || match.estado === 'en_curso'
   const minutesUntilCutoff = Math.round((cutoffTime.getTime() - now.getTime()) / 1000 / 60)
   const isClosingSoon = !isMatchLocked && minutesUntilCutoff >= 0 && minutesUntilCutoff <= 60
   return (
@@ -542,7 +545,11 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
           <span className="text-xs font-medium uppercase" style={{ color: BAIN.graySecondary, letterSpacing: '0.08em' }}>
             {showGroup && `GRUPO ${match.group} · `}{match.shortDate} · {match.time}
           </span>
-          {isMatchLocked ? (
+          {!teamsConfirmed ? (
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${BAIN.graySecondary}15`, color: BAIN.graySecondary }}>
+              <Lock size={9} strokeWidth={2.5} />Sin definir
+            </span>
+          ) : isMatchLocked ? (
             <span className="inline-flex items-center gap-1 text-[10px] font-bold px-1.5 py-0.5 rounded" style={{ backgroundColor: `${BAIN.graySecondary}15`, color: BAIN.graySecondary }}>
               <Lock size={9} strokeWidth={2.5} />Cerrado
             </span>
@@ -561,7 +568,7 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
       <div className="grid grid-cols-3 items-center gap-3">
         <div className="flex items-center gap-2 justify-end">
           <div className="min-w-0 flex flex-col items-end"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.homeName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.home}</p></div>
-          <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />
+          {teamsConfirmed && {teamsConfirmed && <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />}}
           <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
         </div>
         <div className="text-center">
@@ -586,7 +593,7 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
         </div>
         <div className="flex items-center gap-2 justify-start">
           <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
-          <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />
+          {teamsConfirmed && {teamsConfirmed && <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />}}
           <div className="min-w-0 flex flex-col items-start"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.awayName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.away}</p></div>
         </div>
       </div>
