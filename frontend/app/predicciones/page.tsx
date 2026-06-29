@@ -331,23 +331,20 @@ function PrediccionesContent() {
           </>
         ) : viewMode === 'playoffs' ? (
           <>
-            {playoffSections.length > 0 ? (
-              playoffSections.map((p, pIdx) => (
+            {PLAYOFF_FASES.map((fase, pIdx) => {
+              const section = playoffSections.find(s => s.fase === fase.key)
+              return (
                 <PlayoffSection
-                  key={p.fase}
-                  label={p.label}
-                  matches={p.matches}
+                  key={fase.key}
+                  label={fase.label}
+                  matches={section?.matches ?? []}
                   predictions={predictions}
                   onUpdate={updatePrediction}
                   onClear={clearPrediction}
                   delay={pIdx * 50}
                 />
-              ))
-            ) : (
-              <div className="rounded-md p-10 text-center" style={{ backgroundColor: BAIN.white, border: `1px solid ${BAIN.grayBorder}` }}>
-                <p className="text-sm" style={{ color: BAIN.graySecondary }}>Todavía no hay partidos de playoffs cargados.</p>
-              </div>
-            )}
+              )
+            })}
           </>
         ) : viewMode === 'resultados' ? (
           <ResultsView
