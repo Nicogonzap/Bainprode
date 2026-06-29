@@ -568,7 +568,7 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
       <div className="grid grid-cols-3 items-center gap-3">
         <div className="flex items-center gap-2 justify-end">
           <div className="min-w-0 flex flex-col items-end"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.homeName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.home}</p></div>
-          {teamsConfirmed && {teamsConfirmed && <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />}}
+          {teamsConfirmed && <CountryFlag code={match.home} url={match.homeUrl ?? undefined} size={compact ? 'sm' : 'md'} />}
           <input type="number" min="0" max="20" placeholder="—" value={prediction.home} onChange={e => !isMatchLocked && onUpdate(match.id, 'home', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.home !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.homeName}`} />
         </div>
         <div className="text-center">
@@ -593,7 +593,7 @@ function MatchCard({ match, prediction, onUpdate, onClear, showGroup = false, co
         </div>
         <div className="flex items-center gap-2 justify-start">
           <input type="number" min="0" max="20" placeholder="—" value={prediction.away} onChange={e => !isMatchLocked && onUpdate(match.id, 'away', e.target.value)} disabled={isMatchLocked} className="w-10 sm:w-12 h-10 text-center text-base sm:text-lg font-bold rounded-md focus:outline-none transition-colors" style={{ border: `1px solid ${isMatchLocked ? BAIN.grayBorder : prediction.away !== '' ? BAIN.black : BAIN.grayBorder}`, backgroundColor: isMatchLocked ? BAIN.grayBg : BAIN.white, color: isMatchLocked ? BAIN.graySecondary : BAIN.black, cursor: isMatchLocked ? 'not-allowed' : 'auto' }} aria-label={`Goles de ${match.awayName}`} />
-          {teamsConfirmed && {teamsConfirmed && <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />}}
+          {teamsConfirmed && <CountryFlag code={match.away} url={match.awayUrl ?? undefined} size={compact ? 'sm' : 'md'} />}
           <div className="min-w-0 flex flex-col items-start"><p className="text-xs font-bold truncate hidden sm:block" style={{ color: BAIN.black }}>{match.awayName}</p><p className="text-[10px] font-bold sm:hidden" style={{ color: BAIN.graySecondary }}>{match.away}</p></div>
         </div>
       </div>
